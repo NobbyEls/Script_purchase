@@ -365,29 +365,6 @@
   .filter-select:hover{border-color:var(--border2);}
   .filter-select:focus{border-color:var(--accent);background-color:var(--card2);}
 
-  .filter-price{min-width:250px;}
-  .price-head{display:flex;align-items:center;justify-content:space-between;gap:10px;}
-  .price-values{font-family:var(--mono);font-size:11.5px;color:var(--accent2);white-space:nowrap;}
-  .price-sep{color:var(--text3);margin:0 5px;}
-  .slider-wrap{position:relative;height:24px;margin-top:6px;}
-  .slider-rail{position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);height:4px;background:var(--border2);border-radius:2px;}
-  .slider-fill{position:absolute;top:50%;transform:translateY(-50%);height:4px;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;}
-  .slider-input{
-    position:absolute;top:0;left:0;width:100%;height:24px;margin:0;
-    background:none;pointer-events:none;-webkit-appearance:none;appearance:none;
-  }
-  .slider-input::-webkit-slider-thumb{
-    -webkit-appearance:none;appearance:none;pointer-events:auto;
-    width:15px;height:15px;border-radius:50%;background:var(--accent2);
-    border:2px solid var(--bg);cursor:pointer;box-shadow:0 1px 5px rgba(0,0,0,0.5);
-  }
-  .slider-input::-moz-range-thumb{
-    pointer-events:auto;width:15px;height:15px;border-radius:50%;
-    background:var(--accent2);border:2px solid var(--bg);cursor:pointer;
-  }
-  .slider-input::-webkit-slider-runnable-track{background:none;border:none;}
-  .slider-input::-moz-range-track{background:none;border:none;}
-
   .filter-reset{
     display:inline-flex;align-items:center;gap:5px;
     background:var(--card2);border:1px solid var(--border2);border-radius:7px;
@@ -447,19 +424,13 @@
     <label class="filter-label">Type Proc</label>
     <select class="filter-select" id="filter-type-proc"><option value="">Semua</option></select>
   </div>
-  <div class="filter-group filter-price">
-    <div class="price-head">
-      <label class="filter-label">Range Harga</label>
-      <span class="price-values">
-        <span id="price-min-label">Rp0</span><span class="price-sep">—</span><span id="price-max-label">Rp0</span>
-      </span>
-    </div>
-    <div class="slider-wrap">
-      <div class="slider-rail"></div>
-      <div class="slider-fill" id="slider-fill"></div>
-      <input type="range" class="slider-input" id="price-min" min="0" max="100" value="0">
-      <input type="range" class="slider-input" id="price-max" min="0" max="100" value="100">
-    </div>
+  <div class="filter-group">
+    <label class="filter-label">Harga Minimum</label>
+    <select class="filter-select" id="filter-price-min"><option value="">Semua</option></select>
+  </div>
+  <div class="filter-group">
+    <label class="filter-label">Harga Maksimum</label>
+    <select class="filter-select" id="filter-price-max"><option value="">Semua</option></select>
   </div>
   <button class="filter-reset" onclick="resetFilters()">↺ Reset</button>
   <div class="filter-count" id="filter-count"></div>
@@ -522,7 +493,7 @@ function gsRun(fnName){
 /* Tentukan nama sheet master dari nama sheet purchase:
    "Purchase NB" → "Master SKU NB", "Purchase PC" → "Master SKU PC" */
 function getMasterSheetName(purchaseSheet){
-  var m = /purchase\s*(nb|pc)/i.exec(String(purchaseSheet||''));
+  var m = /purchase\s*(nb)/i.exec(String(purchaseSheet||''));
   return m ? ('Master SKU ' + m[1].toUpperCase()) : null;
 }
 
@@ -1138,33 +1109,27 @@ function buildFilterControls(){
     return '<option value="'+escHtml(v)+'">'+escHtml(v)+'</option>';
   }).join('');
 
-  var minEl = document.getElementById('price-min');
-  var maxEl = document.getElementById('price-max');
-  var lo = Math.floor(masterPriceMin);
-  var hi = Math.ceil(masterPriceMax);
-  if (hi <= lo) hi = lo + 1;
-  var step = Math.max(1, Math.round((hi - lo) / 200));
-
-  minEl.min = lo; minEl.max = hi; minEl.step = step; minEl.value = lo;
-  maxEl.min = lo; maxEl.max = hi; maxEl.step = step; maxEl.value = hi;
-  updatePriceUI();
+  /* Dropdown harga: kelipatan 1 juta, dari 3 juta s/d 20 juta */
+  var priceMinSel = document.getElementById('filter-price-min');
+  var priceMaxSel = document.getElementById('filter-price-max');
+  var priceOpts = '';
+  for (var jt = 3; jt <= 20; jt++) {
+    var val = jt * 1000000;
+    priceOpts += '<option value="'+val+'">Rp'+jt+' Juta</option>';
+  }
+  priceMinSel.innerHTML = '<option value="">Semua</option>' + priceOpts;
+  priceMaxSel.innerHTML = '<option value="">Semua</option>' + priceOpts;
 }
 
 /* Pasang listener kontrol filter (sekali saja, saat init) */
 function initFilters(){
-  var minEl = document.getElementById('price-min');
-  var maxEl = document.getElementById('price-max');
+  var priceMinSel = document.getElementById('filter-price-min');
+  var priceMaxSel = document.getElementById('filter-price-max');
   var lSel  = document.getElementById('filter-type-laptop');
   var pSel  = document.getElementById('filter-type-proc');
 
-  minEl.addEventListener('input', function(){
-    if (parseFloat(minEl.value) > parseFloat(maxEl.value)) minEl.value = maxEl.value;
-    updatePriceUI(); scheduleFilter();
-  });
-  maxEl.addEventListener('input', function(){
-    if (parseFloat(maxEl.value) < parseFloat(minEl.value)) maxEl.value = minEl.value;
-    updatePriceUI(); scheduleFilter();
-  });
+  priceMinSel.addEventListener('change', applyFilters);
+  priceMaxSel.addEventListener('change', applyFilters);
   lSel.addEventListener('change', applyFilters);
   pSel.addEventListener('change', applyFilters);
 }
@@ -1176,40 +1141,18 @@ function resetFilterState(){
   _masterTypeLaptops = []; _masterTypeProcs = [];
   var l = document.getElementById('filter-type-laptop');
   var p = document.getElementById('filter-type-proc');
+  var pMin = document.getElementById('filter-price-min');
+  var pMax = document.getElementById('filter-price-max');
   if (l) l.value = '';
   if (p) p.value = '';
+  if (pMin) pMin.value = '';
+  if (pMax) pMax.value = '';
 }
 
 function showFilterBar(){ document.getElementById('filter-bar').style.display = 'flex'; }
 function hideFilterBar(){
   document.getElementById('filter-bar').style.display = 'none';
   document.getElementById('filter-count').textContent = '';
-}
-
-/* Update label Rupiah + bar terisi pada slider */
-function updatePriceUI(){
-  var minEl = document.getElementById('price-min');
-  var maxEl = document.getElementById('price-max');
-  if (!minEl || !maxEl) return;
-  var lo = parseFloat(minEl.value), hi = parseFloat(maxEl.value);
-  var bMin = parseFloat(minEl.min), bMax = parseFloat(minEl.max);
-  var span = (bMax - bMin) || 1;
-  var pctLo = (lo - bMin) / span * 100;
-  var pctHi = (hi - bMin) / span * 100;
-  var fill = document.getElementById('slider-fill');
-  fill.style.left  = pctLo + '%';
-  fill.style.width = Math.max(0, (pctHi - pctLo)) + '%';
-  document.getElementById('price-min-label').textContent = fmtRupiahJS(lo);
-  document.getElementById('price-max-label').textContent = fmtRupiahJS(hi);
-}
-
-/* Apakah range harga sedang dipersempit dari batas penuh? */
-function priceActive(){
-  var minEl = document.getElementById('price-min');
-  var maxEl = document.getElementById('price-max');
-  if (!minEl || !maxEl) return false;
-  return parseFloat(minEl.value) > parseFloat(minEl.min)
-      || parseFloat(maxEl.value) < parseFloat(maxEl.max);
 }
 
 /* Inti filter — gabungan: search + Type Laptop + Type Proc + Range Harga */
@@ -1219,12 +1162,13 @@ function applyFilters(){
   var q       = (document.getElementById('search-input').value || '').toLowerCase().trim();
   var fLaptop = barVisible ? (document.getElementById('filter-type-laptop').value || '') : '';
   var fProc   = barVisible ? (document.getElementById('filter-type-proc').value   || '') : '';
-  var usePrice = barVisible && priceActive();
-  var lo = 0, hi = 0;
-  if (usePrice){
-    lo = parseFloat(document.getElementById('price-min').value);
-    hi = parseFloat(document.getElementById('price-max').value);
-  }
+
+  /* Range harga dari dropdown */
+  var priceMinVal = barVisible ? (document.getElementById('filter-price-min').value || '') : '';
+  var priceMaxVal = barVisible ? (document.getElementById('filter-price-max').value || '') : '';
+  var usePrice = (priceMinVal !== '' || priceMaxVal !== '');
+  var lo = priceMinVal ? parseFloat(priceMinVal) : 0;
+  var hi = priceMaxVal ? parseFloat(priceMaxVal) : Infinity;
 
   var shown = 0;
   document.querySelectorAll('.dept-section').forEach(function(section){
@@ -1237,7 +1181,12 @@ function applyFilters(){
       var mPrice  = true;
       if (usePrice){
         var h = parseFloat(d.harga);
-        mPrice = !isNaN(h) && h > 0 && h >= lo && h <= hi;
+        if (isNaN(h) || h <= 0) {
+          mPrice = false;
+        } else {
+          if (priceMinVal && h < lo) mPrice = false;
+          if (priceMaxVal && h > hi) mPrice = false;
+        }
       }
       var show = mSearch && mLaptop && mProc && mPrice;
       row.style.display = show ? '' : 'none';
@@ -1254,16 +1203,11 @@ function applyFilters(){
 
 /* Reset semua pilihan filter ke kondisi awal */
 function resetFilters(){
-  var minEl = document.getElementById('price-min');
-  var maxEl = document.getElementById('price-max');
   document.getElementById('filter-type-laptop').value = '';
   document.getElementById('filter-type-proc').value   = '';
+  document.getElementById('filter-price-min').value   = '';
+  document.getElementById('filter-price-max').value   = '';
   document.getElementById('search-input').value       = '';
-  if (minEl && maxEl){
-    minEl.value = minEl.min;
-    maxEl.value = maxEl.max;
-    updatePriceUI();
-  }
   applyFilters();
 }
 
