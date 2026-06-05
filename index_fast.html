@@ -244,6 +244,27 @@
   .val-hels  {color:#4ade80;font-family:var(--mono);font-weight:600;}
   .td-harga  {white-space:nowrap;}
   .hbeli-date{display:block;font-family:var(--mono);font-size:8.5px;color:var(--text3);margin-top:1px;}
+
+  /* ── Popup detail OUT per cabang (hover di ALL OUT) ── */
+  .td-allout{cursor:default;position:relative;}
+  .out-popup{
+    position:fixed;z-index:310;
+    background:linear-gradient(135deg,var(--card2),var(--bg2));
+    border:1px solid var(--border2);border-left:3px solid var(--teal);
+    border-radius:10px;padding:10px 14px;
+    box-shadow:0 12px 40px rgba(0,0,0,0.55);
+    pointer-events:none;opacity:0;transform:translateY(4px);
+    transition:opacity 0.15s ease, transform 0.15s ease;
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    white-space:nowrap;
+  }
+  .out-popup.show{opacity:1;transform:translateY(0);}
+  .out-popup-title{font-size:10px;font-weight:600;color:var(--teal);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;}
+  .out-popup-row{display:flex;justify-content:space-between;gap:16px;padding:2px 0;font-size:12px;}
+  .out-popup-cab{color:var(--text3);font-weight:500;}
+  .out-popup-val{color:var(--teal);font-family:var(--mono);font-weight:600;}
+  .out-popup-val.zero{color:var(--text3);}
+
   .val-zero  {color:var(--text3) !important;}
   .val-neg   {color:var(--red)   !important;}
 
@@ -488,6 +509,12 @@
   <div class="kiro-tooltip-code" id="kiro-tooltip-code"></div>
 </div>
 
+<!-- POPUP detail OUT per cabang -->
+<div class="out-popup" id="out-popup">
+  <div class="out-popup-title">OUT PER CABANG</div>
+  <div id="out-popup-body"></div>
+</div>
+
 <script>
 var currentSheet  = null;
 var allData       = null;
@@ -616,17 +643,16 @@ var COL_WIDTHS = [
    52,        // 5  KK
    52,        // 6  PJ
    58,        // 7  ALL STOK
-   48, 48, 48, 48, 48, 48, 48,  // 8-14  YGY SMG SLO PWT BBS TGL MDN
-   58,        // 15 ALL OUT
-   54,        // 16 OUT QTY
-   54,        // 17 ORDER +
-   54,        // 18 ORDER −
-   58,        // 19 KIRA2
-   58,        // 20 KET KSG
-   52,        // 21 PO
-   52,        // 22 KEEP
-   96,        // 23 HARGA BELI TERAKHIR
-   96         // 24 HARGA ELS
+   58,        // 8  ALL OUT (hover = detail cabang)
+   54,        // 9  OUT QTY
+   54,        // 10 ORDER +
+   54,        // 11 ORDER -
+   58,        // 12 KIRA2
+   58,        // 13 KET KSG
+   52,        // 14 PO
+   52,        // 15 KEEP
+   96,        // 16 HARGA BELI
+   96         // 17 HARGA ELS
 ];
 /* Total = 300+6×52+58+7×48+2×58+54+2×54+58+58+52+52
          = 300+312+58+336+116+54+108+58+58+52+52 = 1,454px
@@ -649,6 +675,7 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('badge-date').textContent = now.toLocaleString('id-ID', opts);
 
   initTooltip();   /* aktifkan tooltip nama barang */
+  initOutPopup();  /* aktifkan popup detail OUT per cabang */
   initFilters();   /* aktifkan filter Master SKU */
 
   /* ── Progress bar helper (10 steps = kelipatan 10%) ── */
@@ -855,7 +882,6 @@ function renderDept(dept) {
             + '<th rowspan="2" class="th-nama th-group">Nama Barang</th>'
             + '<th colspan="6" class="th-group" style="color:#c084fc;border-bottom:1px solid rgba(192,132,252,0.2)">STOK DETAIL</th>'
             + '<th colspan="1" class="th-group blue">ALL STOK</th>'
-            + '<th colspan="7" class="th-group teal">OUT PER CABANG</th>'
             + '<th colspan="1" class="th-group teal">ALL OUT</th>'
             + '<th colspan="1" class="th-group teal">OUT QTY</th>'
             + '<th colspan="2" class="th-group amber">ORDER</th>'
@@ -875,7 +901,6 @@ function renderDept(dept) {
             + '<th class="th-group" style="color:#34d399">KK</th>'
             + '<th class="th-group" style="color:#60a5fa">PJ</th>'
             + '<th class="th-group blue">Total</th>'
-            + CABANG.map(function(c){ return '<th class="th-group teal">'+c+'</th>'; }).join('')
             + '<th class="th-group teal">Total</th>'
             + '<th class="th-group teal">Qty</th>'
             + '<th class="th-group amber">+Qty</th>'
@@ -898,11 +923,6 @@ function renderDept(dept) {
 // RENDER ROW
 // ========================================
 function renderItemRow(item) {
-  var cabangCells = CABANG.map(function(c) {
-    var v = (item.outCabang && item.outCabang[c]) ? item.outCabang[c] : 0;
-    return '<td class="val-out'+(v===0?' val-zero':'')+'">'+v+'</td>';
-  }).join('');
-
   var stok    = item.allStok    || 0;
   var allOut  = item.allOut     || 0;
   var outQty  = item.outQty     || 0;
@@ -957,6 +977,12 @@ function renderItemRow(item) {
       + (lb.tanggal ? '<span class="hbeli-date">'+escHtml(lb.tanggal)+'</span>' : '')
     : '<span class="val-zero">—</span>';
 
+  /* Bangun data-attribute detail cabang untuk popup ALL OUT */
+  var outDetail = CABANG.map(function(c){
+    var v = (item.outCabang && item.outCabang[c]) ? item.outCabang[c] : 0;
+    return c + ':' + v;
+  }).join('|');
+
   return '<tr data-name="'+escAttr((item.name||'').toLowerCase())+'" data-code="'+escAttr((item.code||'').toLowerCase())+'"'
     + ' data-type-laptop="'+escHtml(dTypeLaptop)+'"'
     + ' data-type-proc="'+escHtml(dTypeProc)+'"'
@@ -983,10 +1009,8 @@ function renderItemRow(item) {
     + '<td class="val-pj'   +(pj===0?      ' val-zero':'')+'">'+pj+'</td>'
     /* ── ALL STOK ── */
     + '<td class="val-stok'+(stok===0?' val-zero':stok<0?' val-neg':'')+'">'+stok+'</td>'
-    /* ── OUT PER CABANG ── */
-    + cabangCells
-    /* ── ALL OUT / OUT QTY ── */
-    + '<td class="val-out'+(allOut===0?' val-zero':'')+'">'+allOut+'</td>'
+    /* ── ALL OUT (hover → popup detail cabang) ── */
+    + '<td class="td-allout val-out'+(allOut===0?' val-zero':'')+'" data-out="'+escHtml(outDetail)+'">'+allOut+'</td>'
     + '<td class="val-out'+(outQty===0?' val-zero':'')+'">'+outQty+'</td>'
     /* ── ORDER ── */
     + '<td class="val-order-p'+(orderP===0?' val-zero':'')+'">'+(orderP>0?'+':'')+orderP+'</td>'
@@ -1084,6 +1108,78 @@ function positionTooltip(mx, my) {
 function hideTooltip() {
   if (_tipEl) _tipEl.classList.remove('show');
   _tipActiveBtn = null;
+}
+
+// ========================================
+// POPUP OUT PER CABANG (hover di sel ALL OUT)
+// ========================================
+var _outPopup, _outPopupBody, _outActiveCell = null;
+
+function initOutPopup(){
+  _outPopup     = document.getElementById('out-popup');
+  _outPopupBody = document.getElementById('out-popup-body');
+
+  var area = document.getElementById('content-area');
+
+  area.addEventListener('mouseover', function(e){
+    var cell = e.target.closest ? e.target.closest('.td-allout') : null;
+    if (!cell || cell === _outActiveCell) return;
+    _outActiveCell = cell;
+    showOutPopup(cell);
+  });
+
+  area.addEventListener('mousemove', function(e){
+    if (!_outActiveCell) return;
+    positionOutPopup(e.clientX, e.clientY);
+  });
+
+  area.addEventListener('mouseout', function(e){
+    if (!_outActiveCell) return;
+    var to = e.relatedTarget;
+    if (to && to.closest && to.closest('.td-allout') === _outActiveCell) return;
+    hideOutPopup();
+  });
+
+  window.addEventListener('scroll', hideOutPopup, { passive: true });
+}
+
+function showOutPopup(cell){
+  var raw = cell.dataset.out || '';
+  if (!raw){ hideOutPopup(); return; }
+
+  var pairs = raw.split('|');
+  var html = pairs.map(function(p){
+    var parts = p.split(':');
+    var cab = parts[0] || '';
+    var val = parseInt(parts[1]) || 0;
+    return '<div class="out-popup-row">'
+      + '<span class="out-popup-cab">'+escHtml(cab)+'</span>'
+      + '<span class="out-popup-val'+(val===0?' zero':'')+'">'+val+'</span>'
+      + '</div>';
+  }).join('');
+
+  _outPopupBody.innerHTML = html;
+  _outPopup.classList.add('show');
+}
+
+function positionOutPopup(mx, my){
+  var tw = _outPopup.offsetWidth;
+  var th = _outPopup.offsetHeight;
+  var vw = window.innerWidth;
+  var vh = window.innerHeight;
+  var pad = 12;
+  var x = mx + pad, y = my + pad;
+  if (x + tw + 8 > vw) x = mx - tw - pad;
+  if (y + th + 8 > vh) y = my - th - pad;
+  if (x < 8) x = 8;
+  if (y < 8) y = 8;
+  _outPopup.style.left = x + 'px';
+  _outPopup.style.top  = y + 'px';
+}
+
+function hideOutPopup(){
+  if (_outPopup) _outPopup.classList.remove('show');
+  _outActiveCell = null;
 }
 
 // ========================================
