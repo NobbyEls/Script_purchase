@@ -69,6 +69,49 @@ function doGet() {
 }
 
 // ============================================================
+// ENDPOINT GABUNGAN — 1 round trip untuk semua data
+// getBundle: report (+status) + master + harga beli untuk satu sheet
+// getInitialData: getBundle + daftar nama sheet (dipakai saat buka app)
+// ============================================================
+function getBundle(sheetName) {
+  try {
+    const report   = getReportData(sheetName);
+    const statuses = (report && report.statuses) ? report.statuses : [];
+
+    // Master SKU hanya untuk Purchase NB
+    const masterName = /purchase\s*nb/i.test(String(sheetName || '')) ? 'Master SKU NB' : null;
+    const master  = masterName ? getMasterData(masterName) : null;
+    const lastBuy = getLastPurchaseMap();
+
+    return {
+      success:  report.success,
+      report:   report,
+      statuses: statuses,
+      master:   master,
+      lastBuy:  lastBuy,
+      generatedAt: new Date().toLocaleString('id-ID')
+    };
+  } catch(e) {
+    return { success: false, error: e.toString() };
+  }
+}
+
+function getInitialData(sheetName) {
+  try {
+    const sn = getSheetNames();
+    const sheets = (sn.success && sn.sheets && sn.sheets.length > 0)
+      ? sn.sheets : ['Purchase NB','Purchase PC'];
+    const active = sheetName || sheets[0];
+    const bundle = getBundle(active);
+    bundle.sheets = sheets;
+    bundle.activeSheet = active;
+    return bundle;
+  } catch(e) {
+    return { success: false, error: e.toString() };
+  }
+}
+
+// ============================================================
 // AMBIL NAMA SHEET (hanya yang mengandung "purchase")
 // ============================================================
 function getSheetNames() {
@@ -97,11 +140,19 @@ function getReportData(sheetName) {
 
     const lastRow = sh.getLastRow();
     if (lastRow < CONFIG.DATA_START_ROW + 1) {
-      return { success: true, sheetName: sheetName, departments: [] };
+      return { success: true, sheetName: sheetName, departments: [], statuses: [] };
     }
 
     // Ambil tepat CONFIG.TOTAL_COLS kolom — hindari baca kolom kosong ribuan
     const data = sh.getRange(1, 1, lastRow, CONFIG.TOTAL_COLS).getValues();
+
+    // Status bar dari baris 1 (sudah ikut terbaca) — hemat 1 baca sheet
+    const statuses = [];
+    const statusRow = data[CONFIG.ROW_STATUS] || [];
+    for (let si = CONFIG.COL_STATUS_START; si < statusRow.length; si++) {
+      const sv = String(statusRow[si] || '').trim();
+      if (sv) statuses.push(sv);
+    }
 
     const departments = [];
     let currentDept = null;
@@ -147,6 +198,7 @@ function getReportData(sheetName) {
       success: true,
       sheetName: sheetName,
       departments: clean,
+      statuses: statuses,
       generatedAt: new Date().toLocaleString('id-ID')
     };
 

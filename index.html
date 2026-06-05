@@ -520,29 +520,24 @@ function loadCacheData(sheet){
   return _memCache[sheet] || null;
 }
 
-/* Ambil data segar dari server: report + status + master (jika ada) + harga beli */
+/* Ambil data segar dari server dalam SATU round trip (getBundle) */
 function fetchFresh(sheetName){
-  var masterName    = getMasterSheetName(sheetName);
-  var masterPromise = masterName
-    ? gsRun('getMasterData', masterName).catch(function(){ return null; })
-    : Promise.resolve(null);
-
-  return Promise.all([
-    gsRun('refreshReport', sheetName).catch(function(e){ return { success:false, error:String(e) }; }),
-    masterPromise,
-    gsRun('getLastPurchaseMap').catch(function(){ return null; })
-  ]).then(function(results){
-    var rr     = results[0];   // { success, report, status }
-    var master = results[1];
-    var lastBuy= results[2];   // { success, map }
-    var reportRes = (rr && rr.success && rr.report) ? rr.report : rr;
-    var statuses  = (rr && rr.status && rr.status.success) ? (rr.status.statuses || []) : [];
+  return gsRun('getBundle', sheetName).then(function(b){
+    b = b || {};
     return {
       savedAt:  Date.now(),
-      report:   reportRes,
-      statuses: statuses,
-      master:   master,
-      lastBuy:  lastBuy
+      report:   b.report,
+      statuses: b.statuses || [],
+      master:   b.master,
+      lastBuy:  b.lastBuy
+    };
+  }).catch(function(e){
+    return {
+      savedAt:  Date.now(),
+      report:   { success:false, error:String(e) },
+      statuses: [],
+      master:   null,
+      lastBuy:  null
     };
   });
 }
@@ -654,18 +649,34 @@ document.addEventListener('DOMContentLoaded', function() {
   initTooltip();   /* aktifkan tooltip nama barang */
   initFilters();   /* aktifkan filter Master SKU */
 
-  google.script.run
-    .withSuccessHandler(function(res) {
-      var sheets = (res && res.success && res.sheets && res.sheets.length > 0)
-        ? res.sheets : ['Purchase NB','Purchase PC'];
-      renderSheetTabs(sheets);
-      loadSheet(sheets[0]);
-    })
-    .withFailureHandler(function() {
-      renderSheetTabs(['Purchase NB','Purchase PC']);
-      loadSheet('Purchase NB');
-    })
-    .getSheetNames();
+  /* Buka pertama: SATU panggilan getInitialData (sheet names + semua data) */
+  gsRun('getInitialData', null).then(function(res){
+    var sheets = (res && res.sheets && res.sheets.length > 0)
+      ? res.sheets : ['Purchase NB','Purchase PC'];
+    renderSheetTabs(sheets);
+
+    var active = (res && res.activeSheet) ? res.activeSheet : sheets[0];
+
+    if (res && res.report && res.report.success){
+      currentSheet = active;
+      destroyObserver();
+      resetFilterState();
+      var payload = {
+        savedAt:  Date.now(),
+        report:   res.report,
+        statuses: res.statuses || [],
+        master:   res.master,
+        lastBuy:  res.lastBuy
+      };
+      saveCache(active, payload);
+      applyPayload(active, payload, { rebuildFilters:true, fromCache:false });
+    } else {
+      loadSheet(active);  /* fallback kalau bundle gagal */
+    }
+  }).catch(function(){
+    renderSheetTabs(['Purchase NB','Purchase PC']);
+    loadSheet('Purchase NB');
+  });
 });
 
 // ========================================
