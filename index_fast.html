@@ -505,31 +505,25 @@ function getMasterSheetName(purchaseSheet){
 }
 
 /* ============================================================
-   ONLINE MURNI — tanpa cache
-   Tabel tampil duluan (getBundleLight), lalu Master + Harga Beli
-   dimuat di background (getBundleHeavy) → kolom harga terisi otomatis.
+   ONLINE MURNI — tanpa cache, tanpa lazy-load.
+   Semua data (report + master + harga beli) dimuat sekaligus.
+   Loading 1x penuh → tabel tampil lengkap dengan harga.
    ============================================================ */
 
-/* Ambil data ringan: report + status (tabel bisa tampil duluan) */
-function fetchLight(sheetName){
-  return gsRun('getBundleLight', sheetName).then(function(b){
-    b = b || {};
-    return {
-      report:   b.report,
-      statuses: b.statuses || []
-    };
+/* Fetch semua data dari server (light + heavy berurutan) */
+function fetchAll(sheetName){
+  return gsRun('getBundleLight', sheetName).then(function(light){
+    return gsRun('getBundleHeavy', sheetName).then(function(heavy){
+      return {
+        report:   (light && light.report) || null,
+        statuses: (light && light.statuses) || [],
+        master:   (heavy && heavy.master) || null,
+        lastBuy:  (heavy && heavy.lastBuy) || null
+      };
+    });
+  }).catch(function(e){
+    return { report:{ success:false, error:String(e) }, statuses:[], master:null, lastBuy:null };
   });
-}
-
-/* Ambil data berat: master + harga beli (lazy, di background) */
-function fetchHeavy(sheetName){
-  return gsRun('getBundleHeavy', sheetName).then(function(b){
-    b = b || {};
-    return {
-      master:  b.master,
-      lastBuy: b.lastBuy
-    };
-  }).catch(function(){ return { master:null, lastBuy:null }; });
 }
 
 /* Render badge status dari array string */
@@ -635,8 +629,7 @@ document.addEventListener('DOMContentLoaded', function() {
   initTooltip();   /* aktifkan tooltip nama barang */
   initFilters();   /* aktifkan filter Master SKU */
 
-  /* Buka pertama: getInitialData (report+status RINGAN, tampil cepat)
-     lalu lazy-load data berat (master + harga beli) di background */
+  /* Buka pertama: getInitialData (report+status) + heavy sekaligus */
   gsRun('getInitialData', null).then(function(res){
     var sheets = (res && res.sheets && res.sheets.length > 0)
       ? res.sheets : ['Purchase NB','Purchase PC'];
@@ -648,14 +641,20 @@ document.addEventListener('DOMContentLoaded', function() {
     resetFilterState();
 
     if (res && res.report && res.report.success){
-      /* Tampilkan tabel DULUAN (tanpa harga beli, tanpa filter) */
-      renderStatusBadges(res.statuses || []);
-      allData = res.report;
-      renderReport(res.report);
-      updateUpdatedBadge();
-
-      /* Lazy-load data berat di background */
-      lazyLoadHeavy(active);
+      /* Lanjut ambil heavy sebelum render */
+      gsRun('getBundleHeavy', active).then(function(heavy){
+        heavy = heavy || {};
+        var payload = {
+          report:   res.report,
+          statuses: res.statuses || [],
+          master:   heavy.master || null,
+          lastBuy:  heavy.lastBuy || null
+        };
+        applyPayload(active, payload, { rebuildFilters:true });
+      }).catch(function(){
+        /* Heavy gagal, tampilkan tanpa harga */
+        applyPayload(active, { report:res.report, statuses:res.statuses||[], master:null, lastBuy:null }, { rebuildFilters:true });
+      });
     } else {
       document.getElementById('content-area').innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div>Gagal: '+escHtml((res&&res.report&&res.report.error)||'Unknown')+'</div></div>';
     }
@@ -677,22 +676,15 @@ function doRefresh() {
 
   var sheetName = currentSheet;
 
-  fetchLight(sheetName).then(function(res){
+  fetchAll(sheetName).then(function(payload){
     btn.classList.remove('spinning');
     btn.disabled = false;
 
-    if (!res || !res.report || !res.report.success){
-      alert('Update gagal: ' + ((res && res.report && res.report.error) || 'data tidak tersedia'));
+    if (!payload || !payload.report || !payload.report.success){
+      alert('Update gagal: ' + ((payload && payload.report && payload.report.error) || 'data tidak tersedia'));
       return;
     }
-
-    renderStatusBadges(res.statuses || []);
-    allData = res.report;
-    renderReport(res.report);
-    updateUpdatedBadge();
-
-    /* Lazy-load heavy di background */
-    lazyLoadHeavy(sheetName);
+    applyPayload(sheetName, payload, { rebuildFilters:false });
   }).catch(function(err){
     btn.classList.remove('spinning');
     btn.disabled = false;
@@ -718,7 +710,7 @@ function switchSheet(name, btn) {
 }
 
 // ========================================
-// LOAD SHEET (online, langsung)
+// LOAD SHEET (online, semua sekaligus)
 // ========================================
 function loadSheet(sheetName) {
   currentSheet = sheetName;
@@ -730,42 +722,15 @@ function loadSheet(sheetName) {
   area.innerHTML = '<div class="loading-overlay"><div class="spinner"></div><div class="loading-text">Memuat data '+escHtml(sheetName)+'...</div></div>';
   document.getElementById('status-bar').innerHTML = '<span class="status-badge loading">Memuat...</span>';
 
-  fetchLight(sheetName).then(function(res){
-    if (!res || !res.report || !res.report.success){
+  fetchAll(sheetName).then(function(payload){
+    if (!payload || !payload.report || !payload.report.success){
       hideFilterBar();
-      area.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div>Gagal: '+escHtml((res&&res.report&&res.report.error)||'Unknown error')+'</div></div>';
+      area.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div>Gagal: '+escHtml((payload&&payload.report&&payload.report.error)||'Unknown error')+'</div></div>';
       return;
     }
-    renderStatusBadges(res.statuses || []);
-    allData = res.report;
-    renderReport(res.report);
-    updateUpdatedBadge();
-
-    /* Lazy-load data berat (master + harga beli) di background */
-    lazyLoadHeavy(sheetName);
+    applyPayload(sheetName, payload, { rebuildFilters:true });
   }).catch(function(err){
     area.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div>Error: '+escHtml(String(err))+'</div></div>';
-  });
-}
-
-/* Background fetch: Master SKU + Harga Beli → terisi otomatis tanpa blocking tabel */
-function lazyLoadHeavy(sheetName){
-  fetchHeavy(sheetName).then(function(heavy){
-    /* Pastikan user belum ganti tab saat heavy selesai */
-    if (currentSheet !== sheetName) return;
-
-    if (heavy.master && heavy.master.success){
-      applyMasterData(heavy.master);
-      buildFilterControls();
-      showFilterBar();
-    }
-
-    if (heavy.lastBuy && heavy.lastBuy.success && heavy.lastBuy.map){
-      lastBuyMap = heavy.lastBuy.map;
-    }
-
-    /* Re-render tabel agar kolom Harga Beli & Harga Els terisi */
-    if (allData) renderReport(allData);
   });
 }
 
