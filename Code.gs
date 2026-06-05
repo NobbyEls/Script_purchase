@@ -61,9 +61,15 @@ const MASTER_CONFIG = {
 
 // ============================================================
 // WEB APP ENTRY
+// 2 versi dalam 1 app:
+//   ?mode=cache -> versi dengan in-memory cache (index_cache.html)
+//   ?mode=fast  -> versi tanpa cache, lazy-load (index_fast.html)
+//   default     -> fast
 // ============================================================
-function doGet() {
-  return HtmlService.createHtmlOutputFromFile('index')
+function doGet(e) {
+  var mode = (e && e.parameter && e.parameter.mode) ? e.parameter.mode : 'fast';
+  var file = (mode === 'cache') ? 'index_cache' : 'index_fast';
+  return HtmlService.createHtmlOutputFromFile(file)
     .setTitle('Purchase Report Dashboard')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
