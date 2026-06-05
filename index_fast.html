@@ -273,8 +273,16 @@
   .stok-popup .out-popup-val{color:var(--accent2);}
   .stok-popup .out-popup-val.neg{color:var(--red);background:rgba(239,68,68,0.15);}
 
-  /* ── Angka minus: background merah untuk SEMUA td yang berisi nilai negatif ── */
-  .val-neg{color:#fff !important;background:rgba(239,68,68,0.35) !important;border-radius:3px;}
+  /* ── Angka minus: border merah + glow sekeliling angka ── */
+  .val-neg{
+    color:var(--red) !important;
+    border:1px solid rgba(239,68,68,0.5);
+    border-radius:4px;
+    background:rgba(239,68,68,0.06) !important;
+    box-shadow:0 0 6px rgba(239,68,68,0.25);
+    padding:2px 4px;
+    font-weight:600;
+  }
 
   .val-zero  {color:var(--text3) !important;}
   .val-neg   {color:var(--red)   !important;}
