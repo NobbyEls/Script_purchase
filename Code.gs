@@ -345,10 +345,9 @@ function getLastPurchaseMap() {
       var tglRaw = row[VENDOR_CONFIG.COL_DATE];
       var ts = (tglRaw instanceof Date && !isNaN(tglRaw)) ? tglRaw.getTime() : 0;
 
-      // Harga beli: utamakan "Harga + Diskon" (G), fallback "Harga Normal" (F)
-      var hd = parseFloat(String(row[VENDOR_CONFIG.COL_HARGA_DISKON] || '').replace(/[^0-9.-]/g, ''));
+      // Harga beli = "Harga Normal" (kolom F)
       var hn = parseFloat(String(row[VENDOR_CONFIG.COL_HARGA_NORMAL] || '').replace(/[^0-9.-]/g, ''));
-      var harga = (!isNaN(hd) && hd > 0) ? hd : (!isNaN(hn) ? hn : 0);
+      var harga = (!isNaN(hn) && hn > 0) ? hn : 0;
 
       var tanggal = (tglRaw instanceof Date && !isNaN(tglRaw))
         ? Utilities.formatDate(tglRaw, Session.getScriptTimeZone(), 'dd/MM/yyyy')
