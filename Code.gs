@@ -230,6 +230,12 @@ function parseItem(row, code, name) {
     outCabang[cab] = toNum(row[CONFIG.COL_OUT_START + i]);
   });
 
+  // Stok per cabang (kolom C-I = index 2-8, sesuai urutan CABANG)
+  const stokCabang = {};
+  CONFIG.CABANG.forEach(function(cab, i) {
+    stokCabang[cab] = toNum(row[2 + i]);
+  });
+
   return {
     code:       code,
     name:       name,
@@ -240,6 +246,7 @@ function parseItem(row, code, name) {
     kk:         toNum(row[CONFIG.COL_KK]),
     pj:         toNum(row[CONFIG.COL_PJ]),
     allStok:    toNum(row[CONFIG.COL_ALL_STOK_FULL]),
+    stokCabang: stokCabang,
     outCabang:  outCabang,
     allOut:     toNum(row[CONFIG.COL_ALL_OUT]),
     outQty:     toNum(row[CONFIG.COL_OUT_QTY]),

@@ -247,6 +247,7 @@
 
   /* ── Popup detail OUT per cabang (hover di ALL OUT) ── */
   .td-allout{cursor:default;position:relative;}
+  .td-allstok{cursor:default;position:relative;}
   .out-popup{
     position:fixed;z-index:310;
     background:linear-gradient(135deg,var(--card2),var(--bg2));
@@ -264,6 +265,16 @@
   .out-popup-cab{color:var(--text3);font-weight:500;}
   .out-popup-val{color:var(--teal);font-family:var(--mono);font-weight:600;}
   .out-popup-val.zero{color:var(--text3);}
+  .out-popup-val.neg{color:var(--red);background:rgba(239,68,68,0.15);padding:0 4px;border-radius:3px;}
+
+  /* Stok popup — warna biru */
+  .stok-popup{border-left-color:var(--accent2);}
+  .stok-popup-title{color:var(--accent2) !important;}
+  .stok-popup .out-popup-val{color:var(--accent2);}
+  .stok-popup .out-popup-val.neg{color:var(--red);background:rgba(239,68,68,0.15);}
+
+  /* ── Angka minus: background merah untuk SEMUA td yang berisi nilai negatif ── */
+  .val-neg{color:#fff !important;background:rgba(239,68,68,0.35) !important;border-radius:3px;}
 
   .val-zero  {color:var(--text3) !important;}
   .val-neg   {color:var(--red)   !important;}
@@ -511,8 +522,14 @@
 
 <!-- POPUP detail OUT per cabang -->
 <div class="out-popup" id="out-popup">
-  <div class="out-popup-title">OUT PER CABANG</div>
+  <div class="out-popup-title" id="out-popup-title">OUT PER CABANG</div>
   <div id="out-popup-body"></div>
+</div>
+
+<!-- POPUP detail STOK per cabang -->
+<div class="out-popup stok-popup" id="stok-popup">
+  <div class="out-popup-title stok-popup-title">STOK PER CABANG</div>
+  <div id="stok-popup-body"></div>
 </div>
 
 <script>
@@ -676,6 +693,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   initTooltip();   /* aktifkan tooltip nama barang */
   initOutPopup();  /* aktifkan popup detail OUT per cabang */
+  initStokPopup(); /* aktifkan popup detail STOK per cabang */
   initFilters();   /* aktifkan filter Master SKU */
 
   /* ── Progress bar helper (10 steps = kelipatan 10%) ── */
@@ -983,6 +1001,12 @@ function renderItemRow(item) {
     return c + ':' + v;
   }).join('|');
 
+  /* Bangun data-attribute stok per cabang untuk popup ALL STOK */
+  var stokDetail = CABANG.map(function(c){
+    var v = (item.stokCabang && item.stokCabang[c]) ? item.stokCabang[c] : 0;
+    return c + ':' + v;
+  }).join('|');
+
   return '<tr data-name="'+escAttr((item.name||'').toLowerCase())+'" data-code="'+escAttr((item.code||'').toLowerCase())+'"'
     + ' data-type-laptop="'+escHtml(dTypeLaptop)+'"'
     + ' data-type-proc="'+escHtml(dTypeProc)+'"'
@@ -1001,20 +1025,20 @@ function renderItemRow(item) {
       + '</button>'
     + '</td>'
     /* ── STOK DETAIL ── */
-    + '<td class="val-sub'  +(subTotal===0?' val-zero':'')+'">'+subTotal+'</td>'
-    + '<td class="val-svc'  +(rusak===0?   ' val-zero':'')+'">'+rusak+'</td>'
-    + '<td class="val-so'   +(so===0?      ' val-zero':'')+'">'+so+'</td>'
-    + '<td class="val-dp'   +(dp===0?      ' val-zero':'')+'">'+dp+'</td>'
-    + '<td class="val-kk'   +(kk===0?      ' val-zero':'')+'">'+kk+'</td>'
-    + '<td class="val-pj'   +(pj===0?      ' val-zero':'')+'">'+pj+'</td>'
-    /* ── ALL STOK ── */
-    + '<td class="val-stok'+(stok===0?' val-zero':stok<0?' val-neg':'')+'">'+stok+'</td>'
+    + '<td class="val-sub'  +(subTotal===0?' val-zero':subTotal<0?' val-neg':'')+'">'+subTotal+'</td>'
+    + '<td class="val-svc'  +(rusak===0?   ' val-zero':rusak<0?   ' val-neg':'')+'">'+rusak+'</td>'
+    + '<td class="val-so'   +(so===0?      ' val-zero':so<0?      ' val-neg':'')+'">'+so+'</td>'
+    + '<td class="val-dp'   +(dp===0?      ' val-zero':dp<0?      ' val-neg':'')+'">'+dp+'</td>'
+    + '<td class="val-kk'   +(kk===0?      ' val-zero':kk<0?      ' val-neg':'')+'">'+kk+'</td>'
+    + '<td class="val-pj'   +(pj===0?      ' val-zero':pj<0?      ' val-neg':'')+'">'+pj+'</td>'
+    /* ── ALL STOK (hover → popup stok per cabang) ── */
+    + '<td class="td-allstok val-stok'+(stok===0?' val-zero':stok<0?' val-neg':'')+'" data-stok="'+escHtml(stokDetail)+'">'+stok+'</td>'
     /* ── ALL OUT (hover → popup detail cabang) ── */
-    + '<td class="td-allout val-out'+(allOut===0?' val-zero':'')+'" data-out="'+escHtml(outDetail)+'">'+allOut+'</td>'
-    + '<td class="val-out'+(outQty===0?' val-zero':'')+'">'+outQty+'</td>'
+    + '<td class="td-allout val-out'+(allOut===0?' val-zero':allOut<0?' val-neg':'')+'" data-out="'+escHtml(outDetail)+'">'+allOut+'</td>'
+    + '<td class="val-out'+(outQty===0?' val-zero':outQty<0?' val-neg':'')+'">'+outQty+'</td>'
     /* ── ORDER ── */
-    + '<td class="val-order-p'+(orderP===0?' val-zero':'')+'">'+(orderP>0?'+':'')+orderP+'</td>'
-    + '<td class="val-order-m'+(orderM===0?' val-zero':'')+'">'+orderM+'</td>'
+    + '<td class="val-order-p'+(orderP===0?' val-zero':orderP<0?' val-neg':'')+'">'+(orderP>0?'+':'')+orderP+'</td>'
+    + '<td class="val-order-m'+(orderM===0?' val-zero':orderM<0?' val-neg':'')+'">'+orderM+'</td>'
     /* ── IKIRA / KSG / PO / KEEP ── */
     + '<td class="val-days">'+escHtml(String(ikira2))+'</td>'
     + '<td>'+ksgHtml+'</td>'
@@ -1152,9 +1176,10 @@ function showOutPopup(cell){
     var parts = p.split(':');
     var cab = parts[0] || '';
     var val = parseInt(parts[1]) || 0;
+    var cls = val === 0 ? ' zero' : (val < 0 ? ' neg' : '');
     return '<div class="out-popup-row">'
       + '<span class="out-popup-cab">'+escHtml(cab)+'</span>'
-      + '<span class="out-popup-val'+(val===0?' zero':'')+'">'+val+'</span>'
+      + '<span class="out-popup-val'+cls+'">'+val+'</span>'
       + '</div>';
   }).join('');
 
@@ -1180,6 +1205,77 @@ function positionOutPopup(mx, my){
 function hideOutPopup(){
   if (_outPopup) _outPopup.classList.remove('show');
   _outActiveCell = null;
+}
+
+// ========================================
+// POPUP STOK PER CABANG (hover di sel ALL STOK)
+// ========================================
+var _stokPopup, _stokPopupBody, _stokActiveCell = null;
+
+function initStokPopup(){
+  _stokPopup     = document.getElementById('stok-popup');
+  _stokPopupBody = document.getElementById('stok-popup-body');
+
+  var area = document.getElementById('content-area');
+
+  area.addEventListener('mouseover', function(e){
+    var cell = e.target.closest ? e.target.closest('.td-allstok') : null;
+    if (!cell || cell === _stokActiveCell) return;
+    _stokActiveCell = cell;
+    showStokPopup(cell);
+  });
+
+  area.addEventListener('mousemove', function(e){
+    if (!_stokActiveCell) return;
+    positionStokPopup(e.clientX, e.clientY);
+  });
+
+  area.addEventListener('mouseout', function(e){
+    if (!_stokActiveCell) return;
+    var to = e.relatedTarget;
+    if (to && to.closest && to.closest('.td-allstok') === _stokActiveCell) return;
+    hideStokPopup();
+  });
+}
+
+function showStokPopup(cell){
+  var raw = cell.dataset.stok || '';
+  if (!raw){ hideStokPopup(); return; }
+
+  var pairs = raw.split('|');
+  var html = pairs.map(function(p){
+    var parts = p.split(':');
+    var cab = parts[0] || '';
+    var val = parseInt(parts[1]) || 0;
+    var cls = val === 0 ? ' zero' : (val < 0 ? ' neg' : '');
+    return '<div class="out-popup-row">'
+      + '<span class="out-popup-cab">'+escHtml(cab)+'</span>'
+      + '<span class="out-popup-val'+cls+'">'+val+'</span>'
+      + '</div>';
+  }).join('');
+
+  _stokPopupBody.innerHTML = html;
+  _stokPopup.classList.add('show');
+}
+
+function positionStokPopup(mx, my){
+  var tw = _stokPopup.offsetWidth;
+  var th = _stokPopup.offsetHeight;
+  var vw = window.innerWidth;
+  var vh = window.innerHeight;
+  var pad = 12;
+  var x = mx + pad, y = my + pad;
+  if (x + tw + 8 > vw) x = mx - tw - pad;
+  if (y + th + 8 > vh) y = my - th - pad;
+  if (x < 8) x = 8;
+  if (y < 8) y = 8;
+  _stokPopup.style.left = x + 'px';
+  _stokPopup.style.top  = y + 'px';
+}
+
+function hideStokPopup(){
+  if (_stokPopup) _stokPopup.classList.remove('show');
+  _stokActiveCell = null;
 }
 
 // ========================================
