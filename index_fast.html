@@ -81,7 +81,7 @@
   .progress-pct{color:var(--accent2);font-weight:700;font-size:16px;}
 
   /* ── DEPT ── */
-  .dept-section{margin-bottom:24px;animation:fadeUp 0.35s ease forwards;opacity:0;transform:translateY(12px);}
+  .dept-section{margin-bottom:24px;animation:fadeUp 0.35s ease forwards;opacity:0;transform:translateY(12px);max-width:1400px;margin-left:auto;margin-right:auto;}
   @keyframes fadeUp{to{opacity:1;transform:translateY(0);}}
   .dept-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:10px 16px;background:var(--card2);border:1px solid var(--border2);border-radius:var(--radius);border-left:3px solid var(--accent);}
   .dept-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;}
@@ -96,8 +96,8 @@
     overflow-x:auto;
     overflow-y:visible;
     position:relative;
-    /* Pastikan wrapper tidak memotong konten secara vertikal */
     -webkit-overflow-scrolling:touch;
+    margin:0 auto;  /* posisi tengah */
   }
 
   /*
@@ -273,19 +273,9 @@
   .stok-popup .out-popup-val{color:var(--accent2);}
   .stok-popup .out-popup-val.neg{color:var(--red);background:rgba(239,68,68,0.15);}
 
-  /* ── Angka minus: border merah + glow sekeliling angka ── */
-  .val-neg{
-    color:var(--red) !important;
-    border:1px solid rgba(239,68,68,0.5);
-    border-radius:4px;
-    background:rgba(239,68,68,0.06) !important;
-    box-shadow:0 0 6px rgba(239,68,68,0.25);
-    padding:2px 4px;
-    font-weight:600;
-  }
-
+  /* ── Angka minus: teks merah saja ── */
+  .val-neg   {color:var(--red) !important;font-weight:600;}
   .val-zero  {color:var(--text3) !important;}
-  .val-neg   {color:var(--red)   !important;}
 
   .badge-ksg{display:inline-block;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;background:var(--red-glow);color:var(--red);border:1px solid rgba(239,68,68,0.2);}
   .badge-bns{display:inline-block;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;background:var(--teal-glow);color:var(--teal);border:1px solid rgba(20,184,166,0.2);}
@@ -660,7 +650,7 @@ function applyPayload(sheetName, payload, opts){
  * Total kolom: 1 + 6 + 1 + 7 + 2 + 2 + 1 + 3 = 23 kolom
  */
 var COL_WIDTHS = [
-  300,        // 0  Nama Barang
+  420,        // 0  Nama Barang (diperlebar)
    52,        // 1  Sub Total
    52,        // 2  Rusak
    52,        // 3  SO
