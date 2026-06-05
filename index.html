@@ -505,41 +505,31 @@ function getMasterSheetName(purchaseSheet){
 }
 
 /* ============================================================
-   CACHE SESI (in-memory)
-   Data disimpan di memori (bukan localStorage) -> otomatis hilang
-   saat browser di-refresh / ditutup, sehingga buka ulang = data baru.
-   Cache hanya bertahan untuk pindah-tab dalam sesi yang sama.
+   ONLINE MURNI — tanpa cache
+   Tabel tampil duluan (getBundleLight), lalu Master + Harga Beli
+   dimuat di background (getBundleHeavy) → kolom harga terisi otomatis.
    ============================================================ */
-var _memCache = {};
 
-function saveCache(sheet, payload){
-  _memCache[sheet] = payload;
-}
-
-function loadCacheData(sheet){
-  return _memCache[sheet] || null;
-}
-
-/* Ambil data segar dari server dalam SATU round trip (getBundle) */
-function fetchFresh(sheetName){
-  return gsRun('getBundle', sheetName).then(function(b){
+/* Ambil data ringan: report + status (tabel bisa tampil duluan) */
+function fetchLight(sheetName){
+  return gsRun('getBundleLight', sheetName).then(function(b){
     b = b || {};
     return {
-      savedAt:  Date.now(),
       report:   b.report,
-      statuses: b.statuses || [],
-      master:   b.master,
-      lastBuy:  b.lastBuy
-    };
-  }).catch(function(e){
-    return {
-      savedAt:  Date.now(),
-      report:   { success:false, error:String(e) },
-      statuses: [],
-      master:   null,
-      lastBuy:  null
+      statuses: b.statuses || []
     };
   });
+}
+
+/* Ambil data berat: master + harga beli (lazy, di background) */
+function fetchHeavy(sheetName){
+  return gsRun('getBundleHeavy', sheetName).then(function(b){
+    b = b || {};
+    return {
+      master:  b.master,
+      lastBuy: b.lastBuy
+    };
+  }).catch(function(){ return { master:null, lastBuy:null }; });
 }
 
 /* Render badge status dari array string */
@@ -555,18 +545,14 @@ function renderStatusBadges(statuses){
   }).join('');
 }
 
-/* Update badge tanggal: kapan data terakhir diperbarui + sumbernya */
-function updateUpdatedBadge(savedAt, fromCache){
-  var d    = savedAt ? new Date(savedAt) : new Date();
+/* Update badge tanggal: kapan data terakhir diperbarui */
+function updateUpdatedBadge(){
+  var d    = new Date();
   var opts = {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'};
-  var el   = document.getElementById('badge-date');
-  el.textContent = (fromCache ? 'Cache: ' : 'Update: ') + d.toLocaleString('id-ID', opts);
-  el.title = fromCache
-    ? 'Data dari cache (offline). Tekan Update untuk ambil data terbaru.'
-    : 'Data baru saja dimuat dari server.';
+  document.getElementById('badge-date').textContent = d.toLocaleString('id-ID', opts);
 }
 
-/* Render semua dari satu payload (cache maupun fresh) */
+/* Render semua dari payload */
 function applyPayload(sheetName, payload, opts){
   opts = opts || {};
   var area = document.getElementById('content-area');
@@ -594,7 +580,7 @@ function applyPayload(sheetName, payload, opts){
 
   allData = payload.report;
   renderReport(payload.report);
-  updateUpdatedBadge(payload.savedAt, opts.fromCache);
+  updateUpdatedBadge();
 }
 
 /*
@@ -649,29 +635,29 @@ document.addEventListener('DOMContentLoaded', function() {
   initTooltip();   /* aktifkan tooltip nama barang */
   initFilters();   /* aktifkan filter Master SKU */
 
-  /* Buka pertama: SATU panggilan getInitialData (sheet names + semua data) */
+  /* Buka pertama: getInitialData (report+status RINGAN, tampil cepat)
+     lalu lazy-load data berat (master + harga beli) di background */
   gsRun('getInitialData', null).then(function(res){
     var sheets = (res && res.sheets && res.sheets.length > 0)
       ? res.sheets : ['Purchase NB','Purchase PC'];
     renderSheetTabs(sheets);
 
     var active = (res && res.activeSheet) ? res.activeSheet : sheets[0];
+    currentSheet = active;
+    destroyObserver();
+    resetFilterState();
 
     if (res && res.report && res.report.success){
-      currentSheet = active;
-      destroyObserver();
-      resetFilterState();
-      var payload = {
-        savedAt:  Date.now(),
-        report:   res.report,
-        statuses: res.statuses || [],
-        master:   res.master,
-        lastBuy:  res.lastBuy
-      };
-      saveCache(active, payload);
-      applyPayload(active, payload, { rebuildFilters:true, fromCache:false });
+      /* Tampilkan tabel DULUAN (tanpa harga beli, tanpa filter) */
+      renderStatusBadges(res.statuses || []);
+      allData = res.report;
+      renderReport(res.report);
+      updateUpdatedBadge();
+
+      /* Lazy-load data berat di background */
+      lazyLoadHeavy(active);
     } else {
-      loadSheet(active);  /* fallback kalau bundle gagal */
+      document.getElementById('content-area').innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div>Gagal: '+escHtml((res&&res.report&&res.report.error)||'Unknown')+'</div></div>';
     }
   }).catch(function(){
     renderSheetTabs(['Purchase NB','Purchase PC']);
@@ -680,7 +666,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ========================================
-// REFRESH (tombol Update) — ambil data baru & simpan ke cache
+// REFRESH (tombol Update) — online, ambil semua data baru
 // ========================================
 function doRefresh() {
   if (!currentSheet) return;
@@ -691,20 +677,22 @@ function doRefresh() {
 
   var sheetName = currentSheet;
 
-  fetchFresh(sheetName).then(function(payload){
+  fetchLight(sheetName).then(function(res){
     btn.classList.remove('spinning');
     btn.disabled = false;
 
-    if (!payload || !payload.report || !payload.report.success){
-      alert('Update gagal: ' + ((payload && payload.report && payload.report.error) || 'data tidak tersedia'));
+    if (!res || !res.report || !res.report.success){
+      alert('Update gagal: ' + ((res && res.report && res.report.error) || 'data tidak tersedia'));
       return;
     }
 
-    /* Simpan ke cache → jadi sumber offline berikutnya */
-    saveCache(sheetName, payload);
+    renderStatusBadges(res.statuses || []);
+    allData = res.report;
+    renderReport(res.report);
+    updateUpdatedBadge();
 
-    /* Render; rebuildFilters:false agar pilihan filter user tetap dipertahankan */
-    applyPayload(sheetName, payload, { rebuildFilters:false, fromCache:false });
+    /* Lazy-load heavy di background */
+    lazyLoadHeavy(sheetName);
   }).catch(function(err){
     btn.classList.remove('spinning');
     btn.disabled = false;
@@ -730,7 +718,7 @@ function switchSheet(name, btn) {
 }
 
 // ========================================
-// LOAD SHEET (cache-first, offline)
+// LOAD SHEET (online, langsung)
 // ========================================
 function loadSheet(sheetName) {
   currentSheet = sheetName;
@@ -739,23 +727,45 @@ function loadSheet(sheetName) {
   resetFilterState();
 
   var area = document.getElementById('content-area');
-
-  /* 1) Coba ambil dari cache → tampil INSTAN tanpa akses server */
-  var cached = loadCacheData(sheetName);
-  if (cached) {
-    applyPayload(sheetName, cached, { rebuildFilters:true, fromCache:true });
-    return;
-  }
-
-  /* 2) Cache kosong (pertama kali) → fetch dari server lalu simpan */
   area.innerHTML = '<div class="loading-overlay"><div class="spinner"></div><div class="loading-text">Memuat data '+escHtml(sheetName)+'...</div></div>';
   document.getElementById('status-bar').innerHTML = '<span class="status-badge loading">Memuat...</span>';
 
-  fetchFresh(sheetName).then(function(payload){
-    if (payload && payload.report && payload.report.success) {
-      saveCache(sheetName, payload);
+  fetchLight(sheetName).then(function(res){
+    if (!res || !res.report || !res.report.success){
+      hideFilterBar();
+      area.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div>Gagal: '+escHtml((res&&res.report&&res.report.error)||'Unknown error')+'</div></div>';
+      return;
     }
-    applyPayload(sheetName, payload, { rebuildFilters:true, fromCache:false });
+    renderStatusBadges(res.statuses || []);
+    allData = res.report;
+    renderReport(res.report);
+    updateUpdatedBadge();
+
+    /* Lazy-load data berat (master + harga beli) di background */
+    lazyLoadHeavy(sheetName);
+  }).catch(function(err){
+    area.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div>Error: '+escHtml(String(err))+'</div></div>';
+  });
+}
+
+/* Background fetch: Master SKU + Harga Beli → terisi otomatis tanpa blocking tabel */
+function lazyLoadHeavy(sheetName){
+  fetchHeavy(sheetName).then(function(heavy){
+    /* Pastikan user belum ganti tab saat heavy selesai */
+    if (currentSheet !== sheetName) return;
+
+    if (heavy.master && heavy.master.success){
+      applyMasterData(heavy.master);
+      buildFilterControls();
+      showFilterBar();
+    }
+
+    if (heavy.lastBuy && heavy.lastBuy.success && heavy.lastBuy.map){
+      lastBuyMap = heavy.lastBuy.map;
+    }
+
+    /* Re-render tabel agar kolom Harga Beli & Harga Els terisi */
+    if (allData) renderReport(allData);
   });
 }
 

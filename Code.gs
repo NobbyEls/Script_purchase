@@ -69,27 +69,35 @@ function doGet() {
 }
 
 // ============================================================
-// ENDPOINT GABUNGAN — 1 round trip untuk semua data
-// getBundle: report (+status) + master + harga beli untuk satu sheet
-// getInitialData: getBundle + daftar nama sheet (dipakai saat buka app)
+// ENDPOINT GABUNGAN — dipecah 2 level agar tabel CEPAT tampil:
+// getBundleLight: report + status saja (sheet Purchase — ringan)
+// getBundleHeavy: master + harga beli (sheet Master + Vendor — berat)
+// getInitialData: getBundleLight + daftar sheet (buka app pertama kali)
 // ============================================================
-function getBundle(sheetName) {
+function getBundleLight(sheetName) {
   try {
     const report   = getReportData(sheetName);
     const statuses = (report && report.statuses) ? report.statuses : [];
+    return {
+      success:  report.success,
+      report:   report,
+      statuses: statuses
+    };
+  } catch(e) {
+    return { success: false, error: e.toString() };
+  }
+}
 
+function getBundleHeavy(sheetName) {
+  try {
     // Master SKU hanya untuk Purchase NB
     const masterName = /purchase\s*nb/i.test(String(sheetName || '')) ? 'Master SKU NB' : null;
     const master  = masterName ? getMasterData(masterName) : null;
     const lastBuy = getLastPurchaseMap();
-
     return {
-      success:  report.success,
-      report:   report,
-      statuses: statuses,
-      master:   master,
-      lastBuy:  lastBuy,
-      generatedAt: new Date().toLocaleString('id-ID')
+      success: true,
+      master:  master,
+      lastBuy: lastBuy
     };
   } catch(e) {
     return { success: false, error: e.toString() };
@@ -102,7 +110,7 @@ function getInitialData(sheetName) {
     const sheets = (sn.success && sn.sheets && sn.sheets.length > 0)
       ? sn.sheets : ['Purchase NB','Purchase PC'];
     const active = sheetName || sheets[0];
-    const bundle = getBundle(active);
+    const bundle = getBundleLight(active);
     bundle.sheets = sheets;
     bundle.activeSheet = active;
     return bundle;
