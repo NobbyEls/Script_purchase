@@ -497,6 +497,104 @@ function getMasterSheetName(purchaseSheet){
   return m ? ('Master SKU ' + m[1].toUpperCase()) : null;
 }
 
+/* ============================================================
+   CACHE OFFLINE (localStorage)
+   Data disimpan per-sheet. Setelah load, app pakai cache —
+   tidak fetch ulang sampai tombol Update ditekan.
+   ============================================================ */
+var CACHE_PREFIX = 'pr_cache_v2_';
+function cacheKey(sheet){ return CACHE_PREFIX + sheet; }
+
+function saveCache(sheet, payload){
+  try {
+    localStorage.setItem(cacheKey(sheet), JSON.stringify(payload));
+  } catch(e){
+    /* localStorage penuh / diblokir -> abaikan, app tetap jalan */
+  }
+}
+
+function loadCacheData(sheet){
+  try {
+    var raw = localStorage.getItem(cacheKey(sheet));
+    return raw ? JSON.parse(raw) : null;
+  } catch(e){ return null; }
+}
+
+/* Ambil data segar dari server: report + status + master (jika ada) */
+function fetchFresh(sheetName){
+  var masterName    = getMasterSheetName(sheetName);
+  var masterPromise = masterName
+    ? gsRun('getMasterData', masterName).catch(function(){ return null; })
+    : Promise.resolve(null);
+
+  return Promise.all([
+    gsRun('refreshReport', sheetName).catch(function(e){ return { success:false, error:String(e) }; }),
+    masterPromise
+  ]).then(function(results){
+    var rr     = results[0];   // { success, report, status }
+    var master = results[1];
+    var reportRes = (rr && rr.success && rr.report) ? rr.report : rr;
+    var statuses  = (rr && rr.status && rr.status.success) ? (rr.status.statuses || []) : [];
+    return {
+      savedAt:  Date.now(),
+      report:   reportRes,
+      statuses: statuses,
+      master:   master
+    };
+  });
+}
+
+/* Render badge status dari array string */
+function renderStatusBadges(statuses){
+  var bar = document.getElementById('status-bar');
+  if (!statuses || statuses.length === 0){
+    bar.innerHTML = '<span class="status-badge err">Status N/A</span>';
+    return;
+  }
+  bar.innerHTML = statuses.map(function(s){
+    var isOk = String(s).toLowerCase().includes('ok');
+    return '<span class="status-badge '+(isOk?'ok':'err')+'">'+escHtml(s)+'</span>';
+  }).join('');
+}
+
+/* Update badge tanggal: kapan data terakhir diperbarui + sumbernya */
+function updateUpdatedBadge(savedAt, fromCache){
+  var d    = savedAt ? new Date(savedAt) : new Date();
+  var opts = {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'};
+  var el   = document.getElementById('badge-date');
+  el.textContent = (fromCache ? 'Cache: ' : 'Update: ') + d.toLocaleString('id-ID', opts);
+  el.title = fromCache
+    ? 'Data dari cache (offline). Tekan Update untuk ambil data terbaru.'
+    : 'Data baru saja dimuat dari server.';
+}
+
+/* Render semua dari satu payload (cache maupun fresh) */
+function applyPayload(sheetName, payload, opts){
+  opts = opts || {};
+  var area = document.getElementById('content-area');
+
+  if (!payload || !payload.report || !payload.report.success){
+    hideFilterBar();
+    area.innerHTML = '<div class="empty-state"><div class="empty-icon">!</div><div>Gagal: '
+      + escHtml((payload && payload.report && payload.report.error) || 'Data tidak tersedia') + '</div></div>';
+    return;
+  }
+
+  renderStatusBadges(payload.statuses || []);
+
+  if (payload.master && payload.master.success){
+    applyMasterData(payload.master);
+    if (opts.rebuildFilters) buildFilterControls();
+    showFilterBar();
+  } else {
+    hideFilterBar();
+  }
+
+  allData = payload.report;
+  renderReport(payload.report);
+  updateUpdatedBadge(payload.savedAt, opts.fromCache);
+}
+
 /*
  * ── DEFINISI LEBAR KOLOM ──
  * Satu sumber kebenaran untuk JS dan HTML.
@@ -562,30 +660,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ========================================
-// STATUS BAR
-// ========================================
-function loadStatusBar(sheetName) {
-  var bar = document.getElementById('status-bar');
-  bar.innerHTML = '<span class="status-badge loading">Memuat...</span>';
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res || !res.success || !res.statuses || res.statuses.length === 0) {
-        bar.innerHTML = '<span class="status-badge err">Status N/A</span>';
-        return;
-      }
-      bar.innerHTML = res.statuses.map(function(s) {
-        var isOk = s.toLowerCase().includes('ok');
-        return '<span class="status-badge '+(isOk?'ok':'err')+'">'+escHtml(s)+'</span>';
-      }).join('');
-    })
-    .withFailureHandler(function() {
-      bar.innerHTML = '<span class="status-badge err">Gagal</span>';
-    })
-    .getStatusBar(sheetName);
-}
-
-// ========================================
-// REFRESH
+// REFRESH (tombol Update) — ambil data baru & simpan ke cache
 // ========================================
 function doRefresh() {
   if (!currentSheet) return;
@@ -594,48 +669,26 @@ function doRefresh() {
   btn.disabled = true;
   destroyObserver();
 
-  var masterName    = getMasterSheetName(currentSheet);
-  var masterPromise = masterName
-    ? gsRun('getMasterData', masterName).catch(function(){ return null; })
-    : Promise.resolve(null);
+  var sheetName = currentSheet;
 
-  Promise.all([
-    gsRun('refreshReport', currentSheet).catch(function(e){ return { success:false, error:String(e) }; }),
-    masterPromise
-  ]).then(function(results){
+  fetchFresh(sheetName).then(function(payload){
     btn.classList.remove('spinning');
     btn.disabled = false;
 
-    var res    = results[0];
-    var master = results[1];
-    if (!res || !res.success) return;
-
-    /* Update status bar */
-    var bar = document.getElementById('status-bar');
-    if (res.status && res.status.success && res.status.statuses && res.status.statuses.length > 0) {
-      bar.innerHTML = res.status.statuses.map(function(s) {
-        var isOk = s.toLowerCase().includes('ok');
-        return '<span class="status-badge '+(isOk?'ok':'err')+'">'+escHtml(s)+'</span>';
-      }).join('');
+    if (!payload || !payload.report || !payload.report.success){
+      alert('Update gagal: ' + ((payload && payload.report && payload.report.error) || 'data tidak tersedia'));
+      return;
     }
 
-    /* Update timestamp */
-    var now  = new Date();
-    var opts = {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'};
-    document.getElementById('badge-date').textContent = now.toLocaleString('id-ID', opts);
+    /* Simpan ke cache → jadi sumber offline berikutnya */
+    saveCache(sheetName, payload);
 
-    /* Perbarui data master TANPA reset pilihan filter user */
-    if (master && master.success) {
-      applyMasterData(master);
-      showFilterBar();
-    }
-
-    allData = res.report;
-    renderReport(res.report);   /* renderReport akan re-apply filter yang aktif */
+    /* Render; rebuildFilters:false agar pilihan filter user tetap dipertahankan */
+    applyPayload(sheetName, payload, { rebuildFilters:false, fromCache:false });
   }).catch(function(err){
     btn.classList.remove('spinning');
     btn.disabled = false;
-    alert('Refresh gagal: ' + err);
+    alert('Update gagal: ' + err);
   });
 }
 
@@ -657,7 +710,7 @@ function switchSheet(name, btn) {
 }
 
 // ========================================
-// LOAD SHEET
+// LOAD SHEET (cache-first, offline)
 // ========================================
 function loadSheet(sheetName) {
   currentSheet = sheetName;
@@ -666,39 +719,23 @@ function loadSheet(sheetName) {
   resetFilterState();
 
   var area = document.getElementById('content-area');
+
+  /* 1) Coba ambil dari cache → tampil INSTAN tanpa akses server */
+  var cached = loadCacheData(sheetName);
+  if (cached) {
+    applyPayload(sheetName, cached, { rebuildFilters:true, fromCache:true });
+    return;
+  }
+
+  /* 2) Cache kosong (pertama kali) → fetch dari server lalu simpan */
   area.innerHTML = '<div class="loading-overlay"><div class="spinner"></div><div class="loading-text">Memuat data '+escHtml(sheetName)+'...</div></div>';
+  document.getElementById('status-bar').innerHTML = '<span class="status-badge loading">Memuat...</span>';
 
-  loadStatusBar(sheetName);
-
-  var masterName    = getMasterSheetName(sheetName);
-  var masterPromise = masterName
-    ? gsRun('getMasterData', masterName).catch(function(){ return null; })
-    : Promise.resolve(null);
-
-  Promise.all([
-    gsRun('getReportData', sheetName).catch(function(e){ return { success:false, error:String(e) }; }),
-    masterPromise
-  ]).then(function(results){
-    var report = results[0];
-    var master = results[1];
-
-    if (!report || !report.success) {
-      hideFilterBar();
-      area.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div>Gagal: '+escHtml((report&&report.error)||'Unknown error')+'</div></div>';
-      return;
+  fetchFresh(sheetName).then(function(payload){
+    if (payload && payload.report && payload.report.success) {
+      saveCache(sheetName, payload);
     }
-
-    /* Siapkan data master + bangun kontrol filter */
-    if (master && master.success) {
-      applyMasterData(master);
-      buildFilterControls();
-      showFilterBar();
-    } else {
-      hideFilterBar();
-    }
-
-    allData = report;
-    renderReport(report);
+    applyPayload(sheetName, payload, { rebuildFilters:true, fromCache:false });
   });
 }
 
