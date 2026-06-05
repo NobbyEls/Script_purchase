@@ -316,6 +316,62 @@ function getVendorHistory(itemCode) {
 }
 
 // ============================================================
+// PETA HARGA BELI TERAKHIR per SKU (dari sheet Cek Vendor)
+// Dipakai untuk kolom "Harga Terakhir Beli" di tabel.
+// ============================================================
+function getLastPurchaseMap() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const vendorSh = ss.getSheets().find(function(s) {
+      return s.getName().toLowerCase().replace(/\s/g,'').includes('cekvendor') ||
+             s.getName().toLowerCase().replace(/\s/g,'').includes('vendor');
+    });
+    if (!vendorSh) return { success: true, map: {} };
+
+    const lastRow = vendorSh.getLastRow();
+    if (lastRow <= VENDOR_CONFIG.DATA_START_ROW) return { success: true, map: {} };
+
+    const startRow1 = VENDOR_CONFIG.DATA_START_ROW + 1;
+    const numRows   = lastRow - VENDOR_CONFIG.DATA_START_ROW;
+    const data = vendorSh.getRange(startRow1, 1, numRows, VENDOR_CONFIG.TOTAL_COLS).getValues();
+
+    const map = {}; // SKU_UPPER -> { ts, harga, tanggal }
+
+    for (var i = 0; i < data.length; i++) {
+      var row = data[i];
+      var sku = String(row[VENDOR_CONFIG.COL_CODE] || '').trim().toUpperCase();
+      if (!sku) continue;
+
+      var tglRaw = row[VENDOR_CONFIG.COL_DATE];
+      var ts = (tglRaw instanceof Date && !isNaN(tglRaw)) ? tglRaw.getTime() : 0;
+
+      // Harga beli: utamakan "Harga + Diskon" (G), fallback "Harga Normal" (F)
+      var hd = parseFloat(String(row[VENDOR_CONFIG.COL_HARGA_DISKON] || '').replace(/[^0-9.-]/g, ''));
+      var hn = parseFloat(String(row[VENDOR_CONFIG.COL_HARGA_NORMAL] || '').replace(/[^0-9.-]/g, ''));
+      var harga = (!isNaN(hd) && hd > 0) ? hd : (!isNaN(hn) ? hn : 0);
+
+      var tanggal = (tglRaw instanceof Date && !isNaN(tglRaw))
+        ? Utilities.formatDate(tglRaw, Session.getScriptTimeZone(), 'dd/MM/yyyy')
+        : String(tglRaw || '');
+
+      var prev = map[sku];
+      if (!prev || ts >= prev.ts) {
+        map[sku] = { ts: ts, harga: harga, tanggal: tanggal };
+      }
+    }
+
+    // Buang field bantu 'ts'
+    Object.keys(map).forEach(function(k){ delete map[k].ts; });
+
+    return { success: true, map: map };
+
+  } catch(e) {
+    Logger.log('getLastPurchaseMap error: ' + e.toString());
+    return { success: false, error: e.toString(), map: {} };
+  }
+}
+
+// ============================================================
 // AMBIL STATUS BAR (baris 1: Data Stok OK, Sell Out OK, dll)
 // ============================================================
 function getStatusBar(sheetName) {

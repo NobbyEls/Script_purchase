@@ -232,6 +232,10 @@
   .val-order-m{color:var(--red);font-family:var(--mono);font-weight:500;}
   .val-days  {color:var(--amber);font-family:var(--mono);font-weight:500;}
   .val-ket   {color:var(--purple);font-family:var(--mono);}
+  .val-hbeli {color:#fbbf24;font-family:var(--mono);font-weight:500;}
+  .val-hels  {color:#4ade80;font-family:var(--mono);font-weight:600;}
+  .td-harga  {white-space:nowrap;}
+  .hbeli-date{display:block;font-family:var(--mono);font-size:8.5px;color:var(--text3);margin-top:1px;}
   .val-zero  {color:var(--text3) !important;}
   .val-neg   {color:var(--red)   !important;}
 
@@ -481,6 +485,9 @@ var masterReady      = false;
 var _masterTypeLaptops = [];
 var _masterTypeProcs   = [];
 
+/* Peta harga beli terakhir (SKU_UPPER -> {harga, tanggal}) */
+var lastBuyMap = {};
+
 /* Wrap google.script.run jadi Promise agar bisa Promise.all */
 function gsRun(fnName){
   var args = Array.prototype.slice.call(arguments, 1);
@@ -498,29 +505,22 @@ function getMasterSheetName(purchaseSheet){
 }
 
 /* ============================================================
-   CACHE OFFLINE (localStorage)
-   Data disimpan per-sheet. Setelah load, app pakai cache —
-   tidak fetch ulang sampai tombol Update ditekan.
+   CACHE SESI (in-memory)
+   Data disimpan di memori (bukan localStorage) -> otomatis hilang
+   saat browser di-refresh / ditutup, sehingga buka ulang = data baru.
+   Cache hanya bertahan untuk pindah-tab dalam sesi yang sama.
    ============================================================ */
-var CACHE_PREFIX = 'pr_cache_v2_';
-function cacheKey(sheet){ return CACHE_PREFIX + sheet; }
+var _memCache = {};
 
 function saveCache(sheet, payload){
-  try {
-    localStorage.setItem(cacheKey(sheet), JSON.stringify(payload));
-  } catch(e){
-    /* localStorage penuh / diblokir -> abaikan, app tetap jalan */
-  }
+  _memCache[sheet] = payload;
 }
 
 function loadCacheData(sheet){
-  try {
-    var raw = localStorage.getItem(cacheKey(sheet));
-    return raw ? JSON.parse(raw) : null;
-  } catch(e){ return null; }
+  return _memCache[sheet] || null;
 }
 
-/* Ambil data segar dari server: report + status + master (jika ada) */
+/* Ambil data segar dari server: report + status + master (jika ada) + harga beli */
 function fetchFresh(sheetName){
   var masterName    = getMasterSheetName(sheetName);
   var masterPromise = masterName
@@ -529,17 +529,20 @@ function fetchFresh(sheetName){
 
   return Promise.all([
     gsRun('refreshReport', sheetName).catch(function(e){ return { success:false, error:String(e) }; }),
-    masterPromise
+    masterPromise,
+    gsRun('getLastPurchaseMap').catch(function(){ return null; })
   ]).then(function(results){
     var rr     = results[0];   // { success, report, status }
     var master = results[1];
+    var lastBuy= results[2];   // { success, map }
     var reportRes = (rr && rr.success && rr.report) ? rr.report : rr;
     var statuses  = (rr && rr.status && rr.status.success) ? (rr.status.statuses || []) : [];
     return {
       savedAt:  Date.now(),
       report:   reportRes,
       statuses: statuses,
-      master:   master
+      master:   master,
+      lastBuy:  lastBuy
     };
   });
 }
@@ -590,6 +593,10 @@ function applyPayload(sheetName, payload, opts){
     hideFilterBar();
   }
 
+  /* Peta harga beli terakhir (untuk kolom Harga Terakhir Beli) */
+  lastBuyMap = (payload.lastBuy && payload.lastBuy.success && payload.lastBuy.map)
+    ? payload.lastBuy.map : {};
+
   allData = payload.report;
   renderReport(payload.report);
   updateUpdatedBadge(payload.savedAt, opts.fromCache);
@@ -617,10 +624,12 @@ var COL_WIDTHS = [
    54,        // 16 OUT QTY
    54,        // 17 ORDER +
    54,        // 18 ORDER −
-   58,        // 19 IKIRA²
+   58,        // 19 KIRA2
    58,        // 20 KET KSG
    52,        // 21 PO
-   52         // 22 KEEP
+   52,        // 22 KEEP
+   96,        // 23 HARGA BELI TERAKHIR
+   96         // 24 HARGA ELS
 ];
 /* Total = 300+6×52+58+7×48+2×58+54+2×54+58+58+52+52
          = 300+312+58+336+116+54+108+58+58+52+52 = 1,454px
@@ -783,10 +792,12 @@ function renderDept(dept) {
             + '<th colspan="1" class="th-group teal">ALL OUT</th>'
             + '<th colspan="1" class="th-group teal">OUT QTY</th>'
             + '<th colspan="2" class="th-group amber">ORDER</th>'
-            + '<th colspan="1" class="th-group amber">IKIRA²</th>'
+            + '<th colspan="1" class="th-group amber">KIRA2</th>'
             + '<th colspan="1" class="th-group purple">KET KSG</th>'
             + '<th colspan="1" class="th-group purple">PO</th>'
             + '<th colspan="1" class="th-group purple">KEEP</th>'
+            + '<th colspan="1" class="th-group" style="color:#fbbf24;border-bottom:1px solid rgba(251,191,36,0.2)">HARGA BELI</th>'
+            + '<th colspan="1" class="th-group" style="color:#4ade80;border-bottom:1px solid rgba(74,222,128,0.2)">HARGA ELS</th>'
           + '</tr>'
           /* ── Row 2: Sub headers ── */
           + '<tr>'
@@ -806,6 +817,8 @@ function renderDept(dept) {
             + '<th class="th-group purple">KSG</th>'
             + '<th class="th-group purple">PO</th>'
             + '<th class="th-group purple">KP</th>'
+            + '<th class="th-group" style="color:#fbbf24">Terakhir</th>'
+            + '<th class="th-group" style="color:#4ade80">Els</th>'
           + '</tr>'
         + '</thead>'
         + '<tbody>'+rows+'</tbody>'
@@ -863,6 +876,20 @@ function renderItemRow(item) {
   var dTypeProc   = m ? (m.typeProc   || '') : '';
   var dHarga      = m ? (m.harga      || '') : '';
 
+  /* Harga Els = harga dari Master SKU (kolom L) */
+  var hargaEls = (m && m.harga) ? m.harga : 0;
+  var hargaElsHtml = hargaEls > 0
+    ? '<span class="val-hels">'+fmtRupiahJS(hargaEls)+'</span>'
+    : '<span class="val-zero">—</span>';
+
+  /* Harga Terakhir Beli = dari peta riwayat pembelian (Cek Vendor) */
+  var lb = lastBuyMap[String(item.code||'').toUpperCase()] || null;
+  var hargaBeli = (lb && lb.harga) ? lb.harga : 0;
+  var hargaBeliHtml = hargaBeli > 0
+    ? '<span class="val-hbeli">'+fmtRupiahJS(hargaBeli)+'</span>'
+      + (lb.tanggal ? '<span class="hbeli-date">'+escHtml(lb.tanggal)+'</span>' : '')
+    : '<span class="val-zero">—</span>';
+
   return '<tr data-name="'+escAttr((item.name||'').toLowerCase())+'" data-code="'+escAttr((item.code||'').toLowerCase())+'"'
     + ' data-type-laptop="'+escHtml(dTypeLaptop)+'"'
     + ' data-type-proc="'+escHtml(dTypeProc)+'"'
@@ -902,6 +929,8 @@ function renderItemRow(item) {
     + '<td>'+ksgHtml+'</td>'
     + '<td>'+poHtml+'</td>'
     + '<td class="val-ket'+(keepVal===0?' val-zero':'')+'">'+keepVal+'</td>'
+    + '<td class="td-harga">'+hargaBeliHtml+'</td>'
+    + '<td class="td-harga">'+hargaElsHtml+'</td>'
     + '</tr>';
 }
 
@@ -1176,6 +1205,7 @@ function resetFilterState(){
   masterMap = {}; masterReady = false;
   masterPriceMin = 0; masterPriceMax = 0;
   _masterTypeLaptops = []; _masterTypeProcs = [];
+  lastBuyMap = {};
   var l = document.getElementById('filter-type-laptop');
   var p = document.getElementById('filter-type-proc');
   var pMin = document.getElementById('filter-price-min');
