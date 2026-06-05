@@ -71,6 +71,11 @@
   .spinner{width:36px;height:36px;border:3px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
   @keyframes spin{to{transform:rotate(360deg);}}
   .loading-text{font-size:13px;color:var(--text3);}
+  .progress-wrap{width:280px;max-width:80%;display:flex;flex-direction:column;align-items:center;gap:8px;}
+  .progress-bar{width:100%;height:6px;background:var(--border2);border-radius:3px;overflow:hidden;}
+  .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;transition:width 0.4s ease;}
+  .progress-label{font-size:12px;color:var(--text3);font-family:var(--mono);display:flex;justify-content:space-between;width:100%;}
+  .progress-pct{color:var(--accent2);font-weight:600;}
 
   /* ── DEPT ── */
   .dept-section{margin-bottom:24px;animation:fadeUp 0.35s ease forwards;opacity:0;transform:translateY(12px);}
@@ -442,7 +447,14 @@
 
 <div class="main">
   <div id="content-area">
-    <div class="loading-overlay"><div class="spinner"></div><div class="loading-text">Memuat data...</div></div>
+    <div class="loading-overlay" id="loading-overlay">
+      <div class="spinner"></div>
+      <div class="loading-text" id="loading-step">Mempersiapkan...</div>
+      <div class="progress-wrap">
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="progress-label"><span id="progress-step-text">Memulai</span><span class="progress-pct" id="progress-pct">0%</span></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -512,10 +524,12 @@ function getMasterSheetName(purchaseSheet){
    ============================================================ */
 var _preloaded = {};   // { sheetName: payload } — data yang sudah di-fetch
 
-/* Fetch semua data 1 sheet dari server */
-function fetchAll(sheetName){
+/* Fetch semua data 1 sheet dari server (dengan progress callback opsional) */
+function fetchAll(sheetName, onStep){
   return gsRun('getBundleLight', sheetName).then(function(light){
+    if (onStep) onStep('Data ' + sheetName);
     return gsRun('getBundleHeavy', sheetName).then(function(heavy){
+      if (onStep) onStep('Harga ' + sheetName);
       return {
         report:   (light && light.report) || null,
         statuses: (light && light.statuses) || [],
@@ -631,9 +645,26 @@ document.addEventListener('DOMContentLoaded', function() {
   initTooltip();   /* aktifkan tooltip nama barang */
   initFilters();   /* aktifkan filter Master SKU */
 
-  /* Buka pertama: ambil daftar sheet lalu fetch KEDUA sheet PARALEL.
-     Saat ganti tab → data sudah siap di _preloaded → render instan. */
+  /* ── Progress bar helper ── */
+  var _totalSteps = 5;  // getSheetNames + Light NB + Heavy NB + Light PC + Heavy PC
+  var _doneSteps  = 0;
+  function updateProgress(stepText){
+    _doneSteps++;
+    var pct = Math.min(100, Math.round((_doneSteps / _totalSteps) * 100));
+    var fillEl = document.getElementById('progress-fill');
+    var pctEl  = document.getElementById('progress-pct');
+    var stepEl = document.getElementById('progress-step-text');
+    var loadEl = document.getElementById('loading-step');
+    if (fillEl)  fillEl.style.width = pct + '%';
+    if (pctEl)   pctEl.textContent  = pct + '%';
+    if (stepEl)  stepEl.textContent  = stepText;
+    if (loadEl)  loadEl.textContent  = stepText;
+  }
+
+  /* Buka pertama: ambil daftar sheet lalu fetch KEDUA sheet PARALEL + progress */
   gsRun('getSheetNames').then(function(sn){
+    updateProgress('Daftar sheet diterima');
+
     var sheets = (sn && sn.success && sn.sheets && sn.sheets.length > 0)
       ? sn.sheets : ['Purchase NB','Purchase PC'];
     renderSheetTabs(sheets);
@@ -643,9 +674,23 @@ document.addEventListener('DOMContentLoaded', function() {
     destroyObserver();
     resetFilterState();
 
-    /* Fetch SEMUA sheet secara paralel */
+    /* Hitung total steps: 1 (getSheetNames) + 2 per sheet (Light + Heavy) */
+    _totalSteps = 1 + (sheets.length * 2);
+
+    /* Fetch SEMUA sheet secara paralel, update progress per tahap */
     var promises = sheets.map(function(s){
-      return fetchAll(s).then(function(payload){ _preloaded[s] = payload; });
+      return gsRun('getBundleLight', s).then(function(light){
+        updateProgress('Data ' + s + ' diterima');
+        return gsRun('getBundleHeavy', s).then(function(heavy){
+          updateProgress('Harga ' + s + ' diterima');
+          _preloaded[s] = {
+            report:   (light && light.report) || null,
+            statuses: (light && light.statuses) || [],
+            master:   (heavy && heavy.master) || null,
+            lastBuy:  (heavy && heavy.lastBuy) || null
+          };
+        });
+      });
     });
 
     Promise.all(promises).then(function(){
@@ -729,10 +774,21 @@ function loadSheet(sheetName) {
 
   /* Belum ada → fetch semua */
   var area = document.getElementById('content-area');
-  area.innerHTML = '<div class="loading-overlay"><div class="spinner"></div><div class="loading-text">Memuat data '+escHtml(sheetName)+'...</div></div>';
+  area.innerHTML = '<div class="loading-overlay"><div class="spinner"></div><div class="loading-text">Memuat data '+escHtml(sheetName)+'...</div>'
+    + '<div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>'
+    + '<div class="progress-label"><span id="progress-step-text">Mengambil data...</span><span class="progress-pct" id="progress-pct">0%</span></div></div></div>';
   document.getElementById('status-bar').innerHTML = '<span class="status-badge loading">Memuat...</span>';
 
-  fetchAll(sheetName).then(function(payload){
+  fetchAll(sheetName, function(stepText){
+    var fillEl = document.getElementById('progress-fill');
+    var pctEl  = document.getElementById('progress-pct');
+    var stepEl = document.getElementById('progress-step-text');
+    var p = fillEl ? (parseFloat(fillEl.style.width) || 0) : 0;
+    p = Math.min(100, p + 50);
+    if (fillEl) fillEl.style.width = p + '%';
+    if (pctEl) pctEl.textContent = Math.round(p) + '%';
+    if (stepEl) stepEl.textContent = stepText;
+  }).then(function(payload){
     _preloaded[sheetName] = payload;
     if (!payload || !payload.report || !payload.report.success){
       hideFilterBar();
