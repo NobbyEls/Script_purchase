@@ -505,12 +505,14 @@ function getMasterSheetName(purchaseSheet){
 }
 
 /* ============================================================
-   ONLINE MURNI — tanpa cache, tanpa lazy-load.
-   Semua data (report + master + harga beli) dimuat sekaligus.
-   Loading 1x penuh → tabel tampil lengkap dengan harga.
+   ONLINE MURNI — tanpa cache file.
+   Buka pertama: fetch KEDUA sheet (NB + PC) paralel.
+   Ganti tab = data sudah siap di _preloaded → render instan.
+   Tombol Update = fetch ulang sheet aktif saja.
    ============================================================ */
+var _preloaded = {};   // { sheetName: payload } — data yang sudah di-fetch
 
-/* Fetch semua data dari server (light + heavy berurutan) */
+/* Fetch semua data 1 sheet dari server */
 function fetchAll(sheetName){
   return gsRun('getBundleLight', sheetName).then(function(light){
     return gsRun('getBundleHeavy', sheetName).then(function(heavy){
@@ -629,35 +631,33 @@ document.addEventListener('DOMContentLoaded', function() {
   initTooltip();   /* aktifkan tooltip nama barang */
   initFilters();   /* aktifkan filter Master SKU */
 
-  /* Buka pertama: getInitialData (report+status) + heavy sekaligus */
-  gsRun('getInitialData', null).then(function(res){
-    var sheets = (res && res.sheets && res.sheets.length > 0)
-      ? res.sheets : ['Purchase NB','Purchase PC'];
+  /* Buka pertama: ambil daftar sheet lalu fetch KEDUA sheet PARALEL.
+     Saat ganti tab → data sudah siap di _preloaded → render instan. */
+  gsRun('getSheetNames').then(function(sn){
+    var sheets = (sn && sn.success && sn.sheets && sn.sheets.length > 0)
+      ? sn.sheets : ['Purchase NB','Purchase PC'];
     renderSheetTabs(sheets);
 
-    var active = (res && res.activeSheet) ? res.activeSheet : sheets[0];
+    var active = sheets[0];
     currentSheet = active;
     destroyObserver();
     resetFilterState();
 
-    if (res && res.report && res.report.success){
-      /* Lanjut ambil heavy sebelum render */
-      gsRun('getBundleHeavy', active).then(function(heavy){
-        heavy = heavy || {};
-        var payload = {
-          report:   res.report,
-          statuses: res.statuses || [],
-          master:   heavy.master || null,
-          lastBuy:  heavy.lastBuy || null
-        };
+    /* Fetch SEMUA sheet secara paralel */
+    var promises = sheets.map(function(s){
+      return fetchAll(s).then(function(payload){ _preloaded[s] = payload; });
+    });
+
+    Promise.all(promises).then(function(){
+      /* Render sheet aktif (pertama) */
+      var payload = _preloaded[active];
+      if (payload && payload.report && payload.report.success){
         applyPayload(active, payload, { rebuildFilters:true });
-      }).catch(function(){
-        /* Heavy gagal, tampilkan tanpa harga */
-        applyPayload(active, { report:res.report, statuses:res.statuses||[], master:null, lastBuy:null }, { rebuildFilters:true });
-      });
-    } else {
-      document.getElementById('content-area').innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div>Gagal: '+escHtml((res&&res.report&&res.report.error)||'Unknown')+'</div></div>';
-    }
+      } else {
+        document.getElementById('content-area').innerHTML =
+          '<div class="empty-state"><div class="empty-icon">⚠️</div><div>Gagal memuat data.</div></div>';
+      }
+    });
   }).catch(function(){
     renderSheetTabs(['Purchase NB','Purchase PC']);
     loadSheet('Purchase NB');
@@ -665,7 +665,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ========================================
-// REFRESH (tombol Update) — online, ambil semua data baru
+// REFRESH (tombol Update) — fetch ulang sheet aktif + simpan
 // ========================================
 function doRefresh() {
   if (!currentSheet) return;
@@ -679,6 +679,8 @@ function doRefresh() {
   fetchAll(sheetName).then(function(payload){
     btn.classList.remove('spinning');
     btn.disabled = false;
+
+    _preloaded[sheetName] = payload;   /* update data tersimpan */
 
     if (!payload || !payload.report || !payload.report.success){
       alert('Update gagal: ' + ((payload && payload.report && payload.report.error) || 'data tidak tersedia'));
@@ -710,7 +712,7 @@ function switchSheet(name, btn) {
 }
 
 // ========================================
-// LOAD SHEET (online, semua sekaligus)
+// LOAD SHEET (cek _preloaded dulu → instan, fallback fetch)
 // ========================================
 function loadSheet(sheetName) {
   currentSheet = sheetName;
@@ -718,11 +720,20 @@ function loadSheet(sheetName) {
   destroyObserver();
   resetFilterState();
 
+  /* Sudah di-preload saat buka pertama? → render instan */
+  var preloaded = _preloaded[sheetName];
+  if (preloaded && preloaded.report && preloaded.report.success) {
+    applyPayload(sheetName, preloaded, { rebuildFilters:true });
+    return;
+  }
+
+  /* Belum ada → fetch semua */
   var area = document.getElementById('content-area');
   area.innerHTML = '<div class="loading-overlay"><div class="spinner"></div><div class="loading-text">Memuat data '+escHtml(sheetName)+'...</div></div>';
   document.getElementById('status-bar').innerHTML = '<span class="status-badge loading">Memuat...</span>';
 
   fetchAll(sheetName).then(function(payload){
+    _preloaded[sheetName] = payload;
     if (!payload || !payload.report || !payload.report.success){
       hideFilterBar();
       area.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div>Gagal: '+escHtml((payload&&payload.report&&payload.report.error)||'Unknown error')+'</div></div>';
