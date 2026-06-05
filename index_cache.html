@@ -506,14 +506,20 @@ function getMasterSheetName(purchaseSheet){
 
 /* ============================================================
    IN-MEMORY CACHE — data tetap saat ganti tab, hilang saat refresh/close.
-   Tabel tampil instan dari cache; tombol Update = fetch data baru.
+   Buka pertama: loading penuh (semua sekaligus termasuk harga).
+   Ganti tab: INSTAN dari cache, tidak loading lagi.
+   Termasuk cache riwayat pembelian (vendor history per SKU).
    ============================================================ */
-var _memCache = {};
+var _memCache = {};        // per-sheet: { report, statuses, master, lastBuy }
+var _historyCache = {};    // per-SKU: { success, history }
 
 function saveCache(sheet, payload){ _memCache[sheet] = payload; }
 function loadCache(sheet){ return _memCache[sheet] || null; }
 
-/* Fetch semua data dari server (1 round trip) */
+function saveHistoryCache(code, data){ _historyCache[code.toUpperCase()] = data; }
+function loadHistoryCache(code){ return _historyCache[code.toUpperCase()] || null; }
+
+/* Fetch semua data dari server sekaligus (tabel + harga lengkap) */
 function fetchAll(sheetName){
   return gsRun('getBundleLight', sheetName).then(function(light){
     return gsRun('getBundleHeavy', sheetName).then(function(heavy){
@@ -632,7 +638,7 @@ document.addEventListener('DOMContentLoaded', function() {
   initTooltip();   /* aktifkan tooltip nama barang */
   initFilters();   /* aktifkan filter Master SKU */
 
-  /* Buka pertama: getInitialData (report+status CEPAT) lalu heavy */
+  /* Buka pertama: loading SEMUA sekaligus (report+harga+master) lalu tampil lengkap */
   gsRun('getInitialData', null).then(function(res){
     var sheets = (res && res.sheets && res.sheets.length > 0)
       ? res.sheets : ['Purchase NB','Purchase PC'];
@@ -644,15 +650,8 @@ document.addEventListener('DOMContentLoaded', function() {
     resetFilterState();
 
     if (res && res.report && res.report.success){
-      /* Tampilkan tabel duluan */
-      renderStatusBadges(res.statuses || []);
-      allData = res.report;
-      renderReport(res.report);
-      updateUpdatedBadge();
-
-      /* Fetch heavy lalu simpan full ke cache */
+      /* Ambil heavy SEBELUM render → harga langsung muncul */
       gsRun('getBundleHeavy', active).then(function(heavy){
-        if (currentSheet !== active) return;
         heavy = heavy || {};
         var payload = {
           report:   res.report,
@@ -661,17 +660,12 @@ document.addEventListener('DOMContentLoaded', function() {
           lastBuy:  heavy.lastBuy || null
         };
         saveCache(active, payload);
-
-        if (heavy.master && heavy.master.success){
-          applyMasterData(heavy.master);
-          buildFilterControls();
-          showFilterBar();
-        }
-        if (heavy.lastBuy && heavy.lastBuy.success && heavy.lastBuy.map){
-          lastBuyMap = heavy.lastBuy.map;
-        }
-        if (allData) renderReport(allData);
-      }).catch(function(){});
+        applyPayload(active, payload, { rebuildFilters:true });
+      }).catch(function(){
+        var payload = { report:res.report, statuses:res.statuses||[], master:null, lastBuy:null };
+        saveCache(active, payload);
+        applyPayload(active, payload, { rebuildFilters:true });
+      });
     } else {
       document.getElementById('content-area').innerHTML = '<div class="empty-state"><div class="empty-icon">!</div><div>Gagal memuat data.</div></div>';
     }
@@ -729,7 +723,7 @@ function switchSheet(name, btn) {
 }
 
 // ========================================
-// LOAD SHEET (cache-first)
+// LOAD SHEET (cache-first: instan jika ada, fetch penuh jika belum)
 // ========================================
 function loadSheet(sheetName) {
   currentSheet = sheetName;
@@ -737,25 +731,30 @@ function loadSheet(sheetName) {
   destroyObserver();
   resetFilterState();
 
-  /* Cek cache dulu — tampil instan */
+  /* Cek cache → tampil INSTAN tanpa loading */
   var cached = loadCache(sheetName);
   if (cached) {
     applyPayload(sheetName, cached, { rebuildFilters:true });
     return;
   }
 
-  /* Tidak ada cache — fetch dari server */
+  /* Tidak ada cache → fetch semua sekaligus (harga ikut) */
   var area = document.getElementById('content-area');
   area.innerHTML = '<div class="loading-overlay"><div class="spinner"></div><div class="loading-text">Memuat data '+escHtml(sheetName)+'...</div></div>';
   document.getElementById('status-bar').innerHTML = '<span class="status-badge loading">Memuat...</span>';
 
   fetchAll(sheetName).then(function(payload){
+    if (!payload || !payload.report || !payload.report.success){
+      hideFilterBar();
+      area.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div>Gagal: '+escHtml((payload&&payload.report&&payload.report.error)||'Unknown')+'</div></div>';
+      return;
+    }
     saveCache(sheetName, payload);
     applyPayload(sheetName, payload, { rebuildFilters:true });
+  }).catch(function(err){
+    area.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div>Error: '+escHtml(String(err))+'</div></div>';
   });
 }
-
-/* Tidak ada lazyLoadHeavy di versi cache — semua dimuat sekaligus */
 
 // ========================================
 // RENDER REPORT
@@ -1307,10 +1306,19 @@ function fmtRupiahJS(n){
 function openHistory(code, name) {
   document.getElementById('modal-item-name').textContent = name || code;
   document.getElementById('modal-item-code').textContent = code;
-  document.getElementById('modal-body').innerHTML =
-    '<div class="modal-loading"><div class="spinner"></div><div>Mengambil riwayat pembelian...</div></div>';
   document.getElementById('modal-footer').style.display = 'none';
   document.getElementById('modal-backdrop').classList.add('show');
+
+  /* Cek cache riwayat dulu → instan tanpa loading */
+  var cached = loadHistoryCache(code);
+  if (cached) {
+    renderHistoryModal(cached.history || []);
+    return;
+  }
+
+  /* Tidak ada cache → fetch dari server */
+  document.getElementById('modal-body').innerHTML =
+    '<div class="modal-loading"><div class="spinner"></div><div>Mengambil riwayat pembelian...</div></div>';
 
   google.script.run
     .withSuccessHandler(function(res) {
@@ -1319,6 +1327,8 @@ function openHistory(code, name) {
           '<div class="modal-empty">⚠️ '+escHtml((res&&res.error)||'Gagal memuat data')+'</div>';
         return;
       }
+      /* Simpan ke cache untuk klik berikutnya */
+      saveHistoryCache(code, res);
       renderHistoryModal(res.history || []);
     })
     .withFailureHandler(function(err) {
