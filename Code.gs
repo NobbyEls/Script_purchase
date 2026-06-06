@@ -53,7 +53,11 @@ const VENDOR_CONFIG = {
 const MASTER_CONFIG = {
   COL_CODE:         0,   // A: Kode Barang (dicocokkan ke Purchase kolom B)
   COL_TYPE_LAPTOP:  2,   // C: Type Laptop
+  COL_RAM:          5,   // F: Ram
+  COL_STORAGE:      6,   // G: Storage SSD
+  COL_SIZE:         7,   // H: Size layar
   COL_TYPE_PROC:    9,   // J: Type Proc
+  COL_PROCESSOR:   10,   // K: Processor (Type Proc 2)
   COL_HARGA:       11,   // L: Harga (untuk range)
   TOTAL_COLS:      12,   // Baca kolom A-L
   DATA_START_ROW:   1    // Index 1 = baris ke-2 (baris 1 = header)
@@ -278,6 +282,10 @@ function getMasterData(masterSheetName) {
     const map       = {};
     const laptopSet = {};
     const procSet   = {};
+    const processorSet = {};
+    const ramSet    = {};
+    const storageSet = {};
+    const sizeSet   = {};
     let priceMin = Infinity, priceMax = -Infinity;
 
     for (let r = MASTER_CONFIG.DATA_START_ROW; r < data.length; r++) {
@@ -288,16 +296,28 @@ function getMasterData(masterSheetName) {
 
       const typeLaptop = String(row[MASTER_CONFIG.COL_TYPE_LAPTOP] || '').trim();
       const typeProc   = String(row[MASTER_CONFIG.COL_TYPE_PROC]   || '').trim();
+      const processor  = String(row[MASTER_CONFIG.COL_PROCESSOR]   || '').trim();
+      const ram        = String(row[MASTER_CONFIG.COL_RAM]         || '').trim();
+      const storage    = String(row[MASTER_CONFIG.COL_STORAGE]     || '').trim();
+      const size       = String(row[MASTER_CONFIG.COL_SIZE]        || '').trim();
       const harga      = toNum(row[MASTER_CONFIG.COL_HARGA]);
 
       map[code.toUpperCase()] = {
         typeLaptop: typeLaptop,
         typeProc:   typeProc,
+        processor:  processor,
+        ram:        ram,
+        storage:    storage,
+        size:       size,
         harga:      harga
       };
 
       if (typeLaptop) laptopSet[typeLaptop] = true;
       if (typeProc)   procSet[typeProc]     = true;
+      if (processor)  processorSet[processor] = true;
+      if (ram)        ramSet[ram]           = true;
+      if (storage)    storageSet[storage]   = true;
+      if (size)       sizeSet[size]         = true;
       if (harga > 0) {
         if (harga < priceMin) priceMin = harga;
         if (harga > priceMax) priceMax = harga;
@@ -312,6 +332,10 @@ function getMasterData(masterSheetName) {
       map:         map,
       typeLaptops: Object.keys(laptopSet).sort(),
       typeProcs:   Object.keys(procSet).sort(),
+      processors:  Object.keys(processorSet).sort(),
+      rams:        Object.keys(ramSet).sort(),
+      storages:    Object.keys(storageSet).sort(),
+      sizes:       Object.keys(sizeSet).sort(),
       priceMin:    priceMin,
       priceMax:    priceMax
     };
