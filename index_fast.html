@@ -647,15 +647,6 @@ function renderStatusBadges(statuses){
   }).join('');
 }
 
-/* Update badge tanggal: kapan data terakhir diperbarui */
-function updateUpdatedBadge(){
-  /* Badge diupdate di doRefresh saat update selesai.
-     Saat first load, set dari waktu sekarang (= waktu data dimuat) */
-  var d    = new Date();
-  var opts = {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'};
-  document.getElementById('badge-date').textContent = d.toLocaleString('id-ID', opts);
-}
-
 /* Render semua dari payload */
 function applyPayload(sheetName, payload, opts){
   opts = opts || {};
@@ -684,7 +675,6 @@ function applyPayload(sheetName, payload, opts){
 
   allData = payload.report;
   renderReport(payload.report);
-  updateUpdatedBadge();
 }
 
 /*
@@ -731,10 +721,6 @@ function makeColgroup() {
 // INIT
 // ========================================
 document.addEventListener('DOMContentLoaded', function() {
-  var now  = new Date();
-  var opts = {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'};
-  document.getElementById('badge-date').textContent = now.toLocaleString('id-ID', opts);
-
   initTooltip();   /* aktifkan tooltip nama barang */
   initOutPopup();  /* aktifkan popup detail OUT per cabang */
   initStokPopup(); /* aktifkan popup detail STOK per cabang */
@@ -800,6 +786,10 @@ document.addEventListener('DOMContentLoaded', function() {
       var payload = _preloaded[active];
       if (payload && payload.report && payload.report.success){
         applyPayload(active, payload, { rebuildFilters:true });
+        /* Set badge tanggal = waktu data pertama kali dimuat */
+        var now  = new Date();
+        var opts = {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'};
+        document.getElementById('badge-date').textContent = now.toLocaleString('id-ID', opts);
       } else {
         document.getElementById('content-area').innerHTML =
           '<div class="empty-state"><div class="empty-icon">⚠️</div><div>Gagal memuat data.</div></div>';
