@@ -391,6 +391,7 @@
     border-bottom:1px solid var(--border);
   }
   .filter-group{display:flex;flex-direction:column;gap:5px;}
+  .filter-nb-only{}  /* default tampil; disembunyikan via JS saat PC */
   .filter-label{
     font-size:10px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;
     color:var(--text3);
@@ -466,37 +467,41 @@
   </div>
 </div>
 
-<!-- FILTER BAR (tampil hanya untuk sheet yang punya Master SKU, mis. Purchase NB) -->
+<!-- FILTER BAR (selalu tampil di kedua tab) -->
 <div class="filter-bar" id="filter-bar" style="display:none;">
   <div class="filter-group">
+    <label class="filter-label">Departemen</label>
+    <select class="filter-select" id="filter-dept"><option value="">Semua Departemen</option></select>
+  </div>
+  <div class="filter-group filter-nb-only">
     <label class="filter-label">Type Laptop</label>
     <select class="filter-select" id="filter-type-laptop"><option value="">Semua</option></select>
   </div>
-  <div class="filter-group">
+  <div class="filter-group filter-nb-only">
     <label class="filter-label">Proc</label>
     <select class="filter-select" id="filter-processor"><option value="">Semua</option></select>
   </div>
-  <div class="filter-group">
+  <div class="filter-group filter-nb-only">
     <label class="filter-label">Type Proc</label>
     <select class="filter-select" id="filter-type-proc"><option value="">Semua</option></select>
   </div>
-  <div class="filter-group">
+  <div class="filter-group filter-nb-only">
     <label class="filter-label">Ram</label>
     <select class="filter-select" id="filter-ram"><option value="">Semua</option></select>
   </div>
-  <div class="filter-group">
+  <div class="filter-group filter-nb-only">
     <label class="filter-label">Storage SSD</label>
     <select class="filter-select" id="filter-storage"><option value="">Semua</option></select>
   </div>
-  <div class="filter-group">
+  <div class="filter-group filter-nb-only">
     <label class="filter-label">Size Layar</label>
     <select class="filter-select" id="filter-size"><option value="">Semua</option></select>
   </div>
-  <div class="filter-group">
+  <div class="filter-group filter-nb-only">
     <label class="filter-label">Harga Minimum</label>
     <select class="filter-select" id="filter-price-min"><option value="">Semua</option></select>
   </div>
-  <div class="filter-group">
+  <div class="filter-group filter-nb-only">
     <label class="filter-label">Harga Maksimum</label>
     <select class="filter-select" id="filter-price-max"><option value="">Semua</option></select>
   </div>
@@ -666,7 +671,8 @@ function applyPayload(sheetName, payload, opts){
     if (opts.rebuildFilters) buildFilterControls();
     showFilterBar();
   } else {
-    hideFilterBar();
+    /* Purchase PC: tampilkan filter bar hanya dengan Departemen */
+    showFilterBarPC();
   }
 
   /* Peta harga beli terakhir (untuk kolom Harga Terakhir Beli) */
@@ -675,6 +681,11 @@ function applyPayload(sheetName, payload, opts){
 
   allData = payload.report;
   renderReport(payload.report);
+
+  /* Populate dropdown departemen dari report */
+  if (opts.rebuildFilters && payload.report && payload.report.departments) {
+    buildDeptFilter(payload.report);
+  }
 }
 
 /*
@@ -1555,6 +1566,7 @@ function initFilters(){
   var ramSel  = document.getElementById('filter-ram');
   var stoSel  = document.getElementById('filter-storage');
   var sizSel  = document.getElementById('filter-size');
+  var deptSel = document.getElementById('filter-dept');
 
   priceMinSel.addEventListener('change', applyFilters);
   priceMaxSel.addEventListener('change', applyFilters);
@@ -1564,6 +1576,7 @@ function initFilters(){
   ramSel.addEventListener('change', applyFilters);
   stoSel.addEventListener('change', applyFilters);
   sizSel.addEventListener('change', applyFilters);
+  deptSel.addEventListener('change', applyFilters);
 }
 
 /* Reset state filter saat pindah sheet (sebelum master baru dimuat) */
@@ -1577,17 +1590,36 @@ function resetFilterState(){
   ids.forEach(function(id){ var el = document.getElementById(id); if(el) el.value = ''; });
 }
 
-function showFilterBar(){ document.getElementById('filter-bar').style.display = 'flex'; }
+function showFilterBar(){
+  document.getElementById('filter-bar').style.display = 'flex';
+  /* Tampilkan filter NB-only */
+  document.querySelectorAll('.filter-nb-only').forEach(function(el){ el.style.display = ''; });
+}
+function showFilterBarPC(){
+  document.getElementById('filter-bar').style.display = 'flex';
+  /* Sembunyikan filter NB-only, hanya Departemen yang tampil */
+  document.querySelectorAll('.filter-nb-only').forEach(function(el){ el.style.display = 'none'; });
+}
 function hideFilterBar(){
   document.getElementById('filter-bar').style.display = 'none';
-  document.getElementById('filter-count').textContent = '';
 }
 
-/* Inti filter — gabungan: search + Type Laptop + Type Proc + Range Harga */
+/* Bangun dropdown departemen dari data report */
+function buildDeptFilter(report){
+  var sel = document.getElementById('filter-dept');
+  if (!report || !report.departments) return;
+  var depts = report.departments.map(function(d){ return d.name; }).filter(function(n){ return n; });
+  sel.innerHTML = '<option value="">Semua Departemen</option>' + depts.map(function(d){
+    return '<option value="'+escHtml(d)+'">'+escHtml(d)+'</option>';
+  }).join('');
+}
+
+/* Inti filter — gabungan: search + dept + semua filter Master */
 function applyFilters(){
   var barVisible = document.getElementById('filter-bar').style.display !== 'none';
 
   var q       = (document.getElementById('search-input').value || '').toLowerCase().trim();
+  var fDept   = barVisible ? (document.getElementById('filter-dept').value || '') : '';
   var fLaptop = barVisible ? (document.getElementById('filter-type-laptop').value || '') : '';
   var fProc   = barVisible ? (document.getElementById('filter-type-proc').value   || '') : '';
   var fProcessor = barVisible ? (document.getElementById('filter-processor').value || '') : '';
@@ -1604,6 +1636,14 @@ function applyFilters(){
 
   var shown = 0;
   document.querySelectorAll('.dept-section').forEach(function(section){
+    var deptName = section.dataset.dept || '';
+
+    /* Filter departemen */
+    if (fDept && deptName !== fDept) {
+      section.style.display = 'none';
+      return;
+    }
+
     var any = false;
     section.querySelectorAll('tbody tr').forEach(function(row){
       var d = row.dataset;
@@ -1631,15 +1671,13 @@ function applyFilters(){
     section.style.display = any ? '' : 'none';
   });
 
-  if (barVisible){
-    document.getElementById('filter-count').textContent = shown + ' item tampil';
-  }
+  document.getElementById('filter-count').textContent = shown + ' item tampil';
   updateAllClones();
 }
 
 /* Reset semua pilihan filter ke kondisi awal */
 function resetFilters(){
-  var ids = ['filter-type-laptop','filter-type-proc','filter-processor','filter-ram','filter-storage','filter-size','filter-price-min','filter-price-max'];
+  var ids = ['filter-dept','filter-type-laptop','filter-type-proc','filter-processor','filter-ram','filter-storage','filter-size','filter-price-min','filter-price-max'];
   ids.forEach(function(id){ var el = document.getElementById(id); if(el) el.value = ''; });
   document.getElementById('search-input').value = '';
   applyFilters();
