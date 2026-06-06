@@ -375,50 +375,32 @@
     font-weight:600;
   }
 
-  /* ── FILTER BAR (Master SKU NB) ── */
+  /* ── FILTER BAR — 1 baris, font kecil ── */
   .filter-bar{
-    position:sticky;
-    top:var(--topbar-h);
-    z-index:90;
-    display:flex;
-    align-items:flex-end;
-    gap:20px;
-    flex-wrap:wrap;
-    padding:12px 24px;
-    background:rgba(13,20,40,0.94);
-    backdrop-filter:blur(16px);
-    -webkit-backdrop-filter:blur(16px);
+    position:sticky;top:var(--topbar-h);z-index:90;
+    display:flex;align-items:flex-end;gap:8px;
+    flex-wrap:nowrap;overflow-x:auto;
+    padding:7px 20px;
+    background:rgba(13,20,40,0.94);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
     border-bottom:1px solid var(--border);
   }
-  .filter-group{display:flex;flex-direction:column;gap:5px;}
-  .filter-nb-only{}  /* default tampil; disembunyikan via JS saat PC */
-  .filter-label{
-    font-size:10px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;
-    color:var(--text3);
-  }
+  .filter-group{display:flex;flex-direction:column;gap:2px;flex-shrink:0;}
+  .filter-nb-only{}
+  .filter-label{font-size:8.5px;font-weight:600;letter-spacing:0.3px;text-transform:uppercase;color:var(--text3);}
   .filter-select{
-    background:var(--card);border:1px solid var(--border);border-radius:7px;
-    color:var(--text1);font-family:var(--font);font-size:12.5px;
-    padding:7px 30px 7px 11px;outline:none;cursor:pointer;min-width:160px;
-    transition:var(--transition);
-    appearance:none;-webkit-appearance:none;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%2364748b' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-    background-repeat:no-repeat;background-position:right 10px center;
+    background:var(--card);border:1px solid var(--border);border-radius:5px;
+    color:var(--text1);font-family:var(--font);font-size:11px;
+    padding:4px 20px 4px 7px;outline:none;cursor:pointer;min-width:80px;
+    transition:var(--transition);appearance:none;-webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' fill='none' stroke='%2364748b' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 5px center;
   }
   .filter-select:hover{border-color:var(--border2);}
   .filter-select:focus{border-color:var(--accent);background-color:var(--card2);}
 
-  .filter-reset{
-    display:inline-flex;align-items:center;gap:5px;
-    background:var(--card2);border:1px solid var(--border2);border-radius:7px;
-    color:var(--text2);font-family:var(--font);font-size:12px;font-weight:500;
-    padding:7px 13px;cursor:pointer;transition:var(--transition);
-  }
+  .filter-reset{display:inline-flex;align-items:center;gap:4px;background:var(--card2);border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-family:var(--font);font-size:10px;font-weight:500;padding:5px 10px;cursor:pointer;transition:var(--transition);flex-shrink:0;}
   .filter-reset:hover{background:var(--red-glow);border-color:rgba(239,68,68,0.3);color:var(--red);}
-  .filter-count{
-    margin-left:auto;font-size:11.5px;color:var(--text3);font-family:var(--mono);
-    background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:5px 12px;align-self:center;
-  }
+  .filter-count{display:none;}  /* disembunyikan */
 
   /* ── Scrollbar ── */
   /* ── Modal Update Progress ── */
