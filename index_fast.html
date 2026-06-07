@@ -1911,9 +1911,22 @@ function filterPushJualFromPreloaded(sheetName, cutoff) {
     if (!dept.items) return;
     dept.items.forEach(function(item) {
       if (!item.code) return;
-      /* Gunakan Sub Total sebagai stok (bukan allStok) */
-      var stok = item.subTotal || 0;
+      /* Stok = Sub Total + DP */
+      var stokSubTotal = item.subTotal || 0;
+      var stokDP = item.dp || 0;
+      var stok = stokSubTotal + stokDP;
       if (stok <= 0) return;
+
+      /* Detail stok per cabang + DP untuk popup */
+      var stokDetailArr = [];
+      if (item.stokCabang) {
+        var CABANG_PUSH = ['YGY','SMG','SLO','PWT','BBS','TGL','MDN'];
+        CABANG_PUSH.forEach(function(c){
+          stokDetailArr.push(c + ':' + ((item.stokCabang && item.stokCabang[c]) || 0));
+        });
+      }
+      stokDetailArr.push('DP:' + stokDP);
+      var stokPopupData = stokDetailArr.join('|');
 
       var codeUpper = item.code.toUpperCase();
       var lb = lastBuyMap[codeUpper] || null;
@@ -1948,6 +1961,7 @@ function filterPushJualFromPreloaded(sheetName, cutoff) {
       items.push({
         name: item.name || item.code,
         stok: stok,
+        stokPopup: stokPopupData,
         lastBuyDate: lastBuyDate,
         usia: usia,
         keterangan: keterangan
@@ -1995,7 +2009,7 @@ function buildPushJualTable(items) {
 
     return '<tr>'
       + '<td><span class="pj-name">' + escHtml(item.name) + '</span></td>'
-      + '<td class="pj-stok">' + item.stok + '</td>'
+      + '<td class="pj-stok td-allstok" data-stok="' + escHtml(item.stokPopup || '') + '">' + item.stok + '</td>'
       + '<td><span class="pj-date">' + escHtml(item.lastBuyDate || '—') + '</span></td>'
       + '<td><span class="' + usiaClass + '">' + escHtml(item.usia || '—') + '</span></td>'
       + '<td>' + ketHtml + '</td>'
