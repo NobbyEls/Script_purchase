@@ -1911,7 +1911,8 @@ function filterPushJualFromPreloaded(sheetName, cutoff) {
     if (!dept.items) return;
     dept.items.forEach(function(item) {
       if (!item.code) return;
-      var stok = item.allStok || 0;
+      /* Gunakan Sub Total sebagai stok (bukan allStok) */
+      var stok = item.subTotal || 0;
       if (stok <= 0) return;
 
       var codeUpper = item.code.toUpperCase();
@@ -1922,7 +1923,7 @@ function filterPushJualFromPreloaded(sheetName, cutoff) {
       var keterangan = '';
 
       if (!lb || !lb.tanggal) {
-        keterangan = 'Copotan / Upgrade';
+        keterangan = 'Copotan / Upgrade / Lebih dari 1 Tahun';
       } else {
         /* Parse tanggal dd/MM/yyyy */
         var parts = lb.tanggal.split('/');
@@ -1932,7 +1933,7 @@ function filterPushJualFromPreloaded(sheetName, cutoff) {
         }
 
         if (!buyDate || isNaN(buyDate.getTime())) {
-          keterangan = 'Copotan / Upgrade';
+          keterangan = 'Copotan / Upgrade / Lebih dari 1 Tahun';
         } else if (buyDate >= cutoff) {
           /* Pembelian terakhir SETELAH atau SAMA DENGAN cutoff → TIDAK masuk push jual */
           return;
@@ -1940,16 +1941,11 @@ function filterPushJualFromPreloaded(sheetName, cutoff) {
           lastBuyDate = lb.tanggal;
           var diffMs = now.getTime() - buyDate.getTime();
           var diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-          if (diffDays >= 60) {
-            usia = Math.floor(diffDays / 30) + ' bulan';
-          } else {
-            usia = diffDays + ' hari';
-          }
+          usia = diffDays + ' hari';
         }
       }
 
       items.push({
-        code: item.code,
         name: item.name || item.code,
         stok: stok,
         lastBuyDate: lastBuyDate,
@@ -1988,14 +1984,9 @@ function buildPushJualTable(items) {
 
   var rows = items.map(function(item) {
     var usiaClass = 'pj-usia';
-    /* Parse usia untuk cek > 90 hari */
     if (item.usia) {
       var usiaNum = parseInt(item.usia);
-      if (item.usia.indexOf('bulan') !== -1) {
-        if (usiaNum * 30 > 90) usiaClass = 'pj-usia-red';
-      } else if (item.usia.indexOf('hari') !== -1) {
-        if (usiaNum > 90) usiaClass = 'pj-usia-red';
-      }
+      if (usiaNum > 90) usiaClass = 'pj-usia-red';
     }
 
     var ketHtml = item.keterangan
@@ -2003,8 +1994,7 @@ function buildPushJualTable(items) {
       : '<span style="color:var(--text3)">—</span>';
 
     return '<tr>'
-      + '<td><span class="pj-code">' + escHtml(item.code) + '</span></td>'
-      + '<td><span class="pj-name">' + escHtml(item.name || item.code) + '</span></td>'
+      + '<td><span class="pj-name">' + escHtml(item.name) + '</span></td>'
       + '<td class="pj-stok">' + item.stok + '</td>'
       + '<td><span class="pj-date">' + escHtml(item.lastBuyDate || '—') + '</span></td>'
       + '<td><span class="' + usiaClass + '">' + escHtml(item.usia || '—') + '</span></td>'
@@ -2014,7 +2004,6 @@ function buildPushJualTable(items) {
 
   return '<table class="pushjual-table">'
     + '<thead><tr>'
-      + '<th>Kode</th>'
       + '<th>Nama Barang</th>'
       + '<th style="text-align:center">Stok</th>'
       + '<th>Terakhir Beli</th>'
