@@ -916,7 +916,29 @@ function switchToPushJual(btn) {
   _pushJualActive = true;
   destroyObserver();
   hideFilterBar();
-  renderPushJualView();
+
+  /* Pastikan kedua sheet sudah preloaded. Jika belum, fetch dulu. */
+  var sheetsNeeded = ['Purchase NB', 'Purchase PC'];
+  var missing = sheetsNeeded.filter(function(s){ return !_preloaded[s]; });
+
+  if (missing.length > 0 || Object.keys(lastBuyMap).length === 0) {
+    var area = document.getElementById('content-area');
+    area.innerHTML = '<div class="loading-overlay"><div class="spinner"></div><div class="loading-text">Memuat data Push Jual...</div></div>';
+    var promises = missing.map(function(s){ return fetchAll(s).then(function(p){ _preloaded[s] = p; }); });
+    Promise.all(promises).then(function(){
+      /* Ambil lastBuyMap dari payload yang ada */
+      sheetsNeeded.forEach(function(s){
+        var p = _preloaded[s];
+        if (p && p.lastBuy && p.lastBuy.success && p.lastBuy.map) {
+          var map = p.lastBuy.map;
+          for (var k in map) { if (map.hasOwnProperty(k)) lastBuyMap[k] = map[k]; }
+        }
+      });
+      if (_pushJualActive) renderPushJualView();
+    });
+  } else {
+    renderPushJualView();
+  }
 }
 
 // ========================================
@@ -1862,22 +1884,79 @@ function fetchPushJualData() {
   var sel = document.getElementById('pushjual-month-select');
   if (!sel) return;
   var cutoffDate = sel.value;
+  var cutoff = new Date(cutoffDate);
 
   var contentEl = document.getElementById('pushjual-content');
-  contentEl.innerHTML = '<div class="loading-overlay"><div class="spinner"></div><div class="loading-text">Memuat data Push Jual...</div></div>';
 
-  gsRun('getPushJualData', cutoffDate).then(function(res) {
-    if (!_pushJualActive) return; // user sudah pindah tab
-    if (!res || !res.success) {
-      contentEl.innerHTML = '<div class="empty-state"><div class="empty-icon">!</div><div>Gagal: ' + escHtml((res && res.error) || 'Unknown') + '</div></div>';
-      return;
-    }
-    _pushJualData = res;
-    renderPushJualTables(res.nb || [], res.pc || []);
-  }).catch(function(err) {
-    if (!_pushJualActive) return;
-    contentEl.innerHTML = '<div class="empty-state"><div class="empty-icon">!</div><div>Error: ' + escHtml(String(err)) + '</div></div>';
+  /* Gunakan data yang sudah ada di _preloaded + lastBuyMap (CLIENT-SIDE, INSTAN) */
+  var nbItems = filterPushJualFromPreloaded('Purchase NB', cutoff);
+  var pcItems = filterPushJualFromPreloaded('Purchase PC', cutoff);
+
+  _pushJualData = { nb: nbItems, pc: pcItems };
+  renderPushJualTables(nbItems, pcItems);
+}
+
+/* Filter Push Jual dari data _preloaded + lastBuyMap — tanpa fetch server */
+function filterPushJualFromPreloaded(sheetName, cutoff) {
+  var payload = _preloaded[sheetName];
+  if (!payload || !payload.report || !payload.report.departments) return [];
+
+  var now = new Date();
+  var items = [];
+
+  payload.report.departments.forEach(function(dept) {
+    if (!dept.items) return;
+    dept.items.forEach(function(item) {
+      if (!item.code) return;
+      var stok = item.allStok || 0;
+      if (stok <= 0) return;
+
+      var codeUpper = item.code.toUpperCase();
+      var lb = lastBuyMap[codeUpper] || null;
+
+      var lastBuyDate = '';
+      var usia = '';
+      var keterangan = '';
+
+      if (!lb || !lb.tanggal) {
+        keterangan = 'Copotan / Upgrade';
+      } else {
+        /* Parse tanggal dd/MM/yyyy */
+        var parts = lb.tanggal.split('/');
+        var buyDate = null;
+        if (parts.length === 3) {
+          buyDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        }
+
+        if (!buyDate || isNaN(buyDate.getTime())) {
+          keterangan = 'Copotan / Upgrade';
+        } else if (buyDate >= cutoff) {
+          /* Pembelian terakhir SETELAH atau SAMA DENGAN cutoff → TIDAK masuk push jual */
+          return;
+        } else {
+          lastBuyDate = lb.tanggal;
+          var diffMs = now.getTime() - buyDate.getTime();
+          var diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          if (diffDays >= 60) {
+            usia = Math.floor(diffDays / 30) + ' bulan';
+          } else {
+            usia = diffDays + ' hari';
+          }
+        }
+      }
+
+      items.push({
+        code: item.code,
+        name: item.name || item.code,
+        stok: stok,
+        lastBuyDate: lastBuyDate,
+        usia: usia,
+        keterangan: keterangan
+      });
+    });
   });
+
+  return items;
 }
 
 function renderPushJualTables(nbItems, pcItems) {
