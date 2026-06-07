@@ -1851,9 +1851,12 @@ function generatePushJualMonthOptions() {
   for (var i = 1; i <= 12; i++) {
     /* Akhir bulan ke-(current - i): new Date(year, month - i + 1, 0) */
     var endOfMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+    /* Set ke 23:59:59 agar perbandingan buyDate < cutoff lebih aman */
+    endOfMonth.setHours(23, 59, 59, 999);
     var label = endOfMonth.toLocaleString('id-ID', { month: 'long', year: 'numeric' });
-    var value = endOfMonth.toISOString();
-    options.push({ label: label, value: value, date: endOfMonth });
+    /* Simpan sebagai timestamp number (hindari masalah timezone ISO) */
+    var value = endOfMonth.getTime();
+    options.push({ label: label, value: String(value), date: endOfMonth });
   }
   return options;
 }
@@ -1883,8 +1886,8 @@ function renderPushJualView() {
 function fetchPushJualData() {
   var sel = document.getElementById('pushjual-month-select');
   if (!sel) return;
-  var cutoffDate = sel.value;
-  var cutoff = new Date(cutoffDate);
+  var cutoffTs = parseInt(sel.value);
+  var cutoff = new Date(cutoffTs);
 
   var contentEl = document.getElementById('pushjual-content');
 

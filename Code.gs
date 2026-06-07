@@ -451,7 +451,11 @@ function getLastPurchaseMap() {
         : String(tglRaw || '');
 
       var prev = map[sku];
-      if (!prev || ts >= prev.ts) {
+      /* Simpan hanya jika: belum ada prev, ATAU ts baru > ts lama (lebih baru)
+         Jangan timpa entry valid (ts>0) dengan entry tanpa tanggal (ts=0) */
+      if (!prev) {
+        map[sku] = { ts: ts, harga: harga, tanggal: tanggal };
+      } else if (ts > 0 && ts >= prev.ts) {
         map[sku] = { ts: ts, harga: harga, tanggal: tanggal };
       }
     }
