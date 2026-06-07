@@ -418,7 +418,34 @@
   ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
   ::-webkit-scrollbar-thumb:hover{background:var(--text3);}
 
-  @media(max-width:768px){.main{padding:16px;}.topbar{padding:0 16px;}.search-input{width:160px;}}
+  /* ── PUSH JUAL ── */
+  .pushjual-container{display:flex;gap:20px;flex-wrap:wrap;}
+  .pushjual-panel{flex:1;min-width:400px;}
+  .pushjual-header{font-size:14px;font-weight:700;color:var(--text1);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;padding:10px 16px;background:var(--card2);border:1px solid var(--border2);border-radius:var(--radius);border-left:3px solid var(--accent);}
+  .pushjual-filter{display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:10px 16px;background:rgba(13,20,40,0.94);border:1px solid var(--border);border-radius:var(--radius);}
+  .pushjual-filter label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.3px;}
+  .pushjual-filter select{background:var(--card);border:1px solid var(--border);border-radius:5px;color:var(--text1);font-family:var(--font);font-size:12px;padding:6px 24px 6px 10px;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' fill='none' stroke='%2364748b' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;transition:var(--transition);}
+  .pushjual-filter select:focus{border-color:var(--accent);background-color:var(--card2);}
+  .pushjual-table-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .pushjual-table{width:100%;border-collapse:collapse;font-size:11.5px;table-layout:auto;}
+  .pushjual-table thead{position:sticky;top:0;z-index:5;}
+  .pushjual-table th{padding:8px 10px;text-align:left;font-size:9.5px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap;border-bottom:2px solid var(--border2);background:var(--bg2);}
+  .pushjual-table th:first-child{padding-left:14px;}
+  .pushjual-table td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text2);font-size:11.5px;vertical-align:middle;}
+  .pushjual-table td:first-child{padding-left:14px;}
+  .pushjual-table tbody tr:hover{background:rgba(59,130,246,0.04);}
+  .pushjual-table tbody tr:last-child td{border-bottom:none;}
+  .pushjual-table .pj-code{font-family:var(--mono);font-size:10.5px;color:var(--accent2);}
+  .pushjual-table .pj-name{color:var(--text1);font-weight:500;}
+  .pushjual-table .pj-stok{font-family:var(--mono);font-weight:600;color:var(--text1);text-align:center;}
+  .pushjual-table .pj-date{font-family:var(--mono);font-size:11px;color:var(--text3);}
+  .pushjual-table .pj-usia{font-family:var(--mono);font-size:11px;color:var(--text1);}
+  .pushjual-table .pj-usia-red{font-family:var(--mono);font-size:11px;color:var(--red);font-weight:600;}
+  .pushjual-table .pj-ket{font-size:10.5px;color:var(--amber);font-weight:600;}
+  .pushjual-empty{text-align:center;padding:30px 20px;color:var(--text3);font-size:12px;}
+  .pushjual-count{font-size:11px;color:var(--text3);font-family:var(--mono);margin-left:auto;}
+
+  @media(max-width:768px){.main{padding:16px;}.topbar{padding:0 16px;}.search-input{width:160px;}.pushjual-container{flex-direction:column;}.pushjual-panel{min-width:100%;}}
 </style>
 </head>
 <body>
@@ -866,16 +893,30 @@ function doRefresh() {
 // ========================================
 function renderSheetTabs(sheets) {
   var c = document.getElementById('sheet-tabs');
-  c.innerHTML = sheets.map(function(s, i) {
+  var html = sheets.map(function(s, i) {
     return '<button class="tab-btn'+(i===0?' active':'')+'" onclick="switchSheet(\''+escAttr(s)+'\',this)">'+escHtml(s)+'</button>';
   }).join('');
+  /* Tambahkan tab Push Jual (hardcoded) */
+  html += '<button class="tab-btn" onclick="switchToPushJual(this)">Push Jual</button>';
+  c.innerHTML = html;
 }
 
 function switchSheet(name, btn) {
   document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
   document.getElementById('search-input').value = '';
+  _pushJualActive = false;
   loadSheet(name);
+}
+
+function switchToPushJual(btn) {
+  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  document.getElementById('search-input').value = '';
+  _pushJualActive = true;
+  destroyObserver();
+  hideFilterBar();
+  renderPushJualView();
 }
 
 // ========================================
@@ -1757,6 +1798,150 @@ function closeModalDirect() {
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') closeModalDirect();
 });
+
+// ========================================
+// PUSH JUAL — tampilan terpisah
+// ========================================
+var _pushJualActive = false;
+var _pushJualData   = null;
+
+/* Generate array 12 bulan terakhir (tanggal akhir bulan) */
+function generatePushJualMonths() {
+  var now = new Date();
+  var months = [];
+  for (var i = 1; i <= 12; i++) {
+    /* Bulan ke-i yang lalu: misal sekarang Juni 2026, i=1 → Mei 2026, i=12 → Juni 2025 */
+    var d = new Date(now.getFullYear(), now.getMonth() - i + 1, 0); // akhir bulan sebelumnya
+    /* Koreksi: kita mau akhir bulan (i-1) dari sekarang */
+    var target = new Date(now.getFullYear(), now.getMonth() - (i - 1), 0);
+    /* Sebenarnya: bulan terbaru = bulan lalu, bulan terlama = 12 bulan lalu */
+    /* Re-think: filter = 12 bulan terakhir. Jika sekarang Juni 2026:
+       - Paling baru: akhir Mei 2026
+       - Paling lama: akhir Juni 2025 */
+    months.push(target);
+  }
+  return months;
+}
+
+function generatePushJualMonthOptions() {
+  var now = new Date();
+  var options = [];
+  for (var i = 1; i <= 12; i++) {
+    /* Akhir bulan ke-(current - i): new Date(year, month - i + 1, 0) */
+    var endOfMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+    var label = endOfMonth.toLocaleString('id-ID', { month: 'long', year: 'numeric' });
+    var value = endOfMonth.toISOString();
+    options.push({ label: label, value: value, date: endOfMonth });
+  }
+  return options;
+}
+
+function renderPushJualView() {
+  var area = document.getElementById('content-area');
+  var months = generatePushJualMonthOptions();
+
+  /* Default = bulan terbaru (index 0) */
+  var optionsHtml = months.map(function(m, i) {
+    return '<option value="' + escHtml(m.value) + '"' + (i === 0 ? ' selected' : '') + '>' + escHtml(m.label) + '</option>';
+  }).join('');
+
+  area.innerHTML =
+    '<div class="pushjual-filter">'
+      + '<label>Filter Bulan Cutoff:</label>'
+      + '<select id="pushjual-month-select" onchange="fetchPushJualData()">' + optionsHtml + '</select>'
+      + '<span class="pushjual-count" id="pushjual-count"></span>'
+    + '</div>'
+    + '<div id="pushjual-content">'
+      + '<div class="loading-overlay"><div class="spinner"></div><div class="loading-text">Memuat data Push Jual...</div></div>'
+    + '</div>';
+
+  fetchPushJualData();
+}
+
+function fetchPushJualData() {
+  var sel = document.getElementById('pushjual-month-select');
+  if (!sel) return;
+  var cutoffDate = sel.value;
+
+  var contentEl = document.getElementById('pushjual-content');
+  contentEl.innerHTML = '<div class="loading-overlay"><div class="spinner"></div><div class="loading-text">Memuat data Push Jual...</div></div>';
+
+  gsRun('getPushJualData', cutoffDate).then(function(res) {
+    if (!_pushJualActive) return; // user sudah pindah tab
+    if (!res || !res.success) {
+      contentEl.innerHTML = '<div class="empty-state"><div class="empty-icon">!</div><div>Gagal: ' + escHtml((res && res.error) || 'Unknown') + '</div></div>';
+      return;
+    }
+    _pushJualData = res;
+    renderPushJualTables(res.nb || [], res.pc || []);
+  }).catch(function(err) {
+    if (!_pushJualActive) return;
+    contentEl.innerHTML = '<div class="empty-state"><div class="empty-icon">!</div><div>Error: ' + escHtml(String(err)) + '</div></div>';
+  });
+}
+
+function renderPushJualTables(nbItems, pcItems) {
+  var contentEl = document.getElementById('pushjual-content');
+  var countEl = document.getElementById('pushjual-count');
+
+  if (countEl) countEl.textContent = 'NB: ' + nbItems.length + ' | PC: ' + pcItems.length;
+
+  contentEl.innerHTML =
+    '<div class="pushjual-container">'
+      + '<div class="pushjual-panel">'
+        + '<div class="pushjual-header">PUSH JUAL &#8212; PURCHASE NB</div>'
+        + '<div class="pushjual-table-wrap">' + buildPushJualTable(nbItems) + '</div>'
+      + '</div>'
+      + '<div class="pushjual-panel">'
+        + '<div class="pushjual-header">PUSH JUAL &#8212; PURCHASE PC</div>'
+        + '<div class="pushjual-table-wrap">' + buildPushJualTable(pcItems) + '</div>'
+      + '</div>'
+    + '</div>';
+}
+
+function buildPushJualTable(items) {
+  if (!items || items.length === 0) {
+    return '<div class="pushjual-empty">Tidak ada item push jual.</div>';
+  }
+
+  var rows = items.map(function(item) {
+    var usiaClass = 'pj-usia';
+    /* Parse usia untuk cek > 90 hari */
+    if (item.usia) {
+      var usiaNum = parseInt(item.usia);
+      if (item.usia.indexOf('bulan') !== -1) {
+        if (usiaNum * 30 > 90) usiaClass = 'pj-usia-red';
+      } else if (item.usia.indexOf('hari') !== -1) {
+        if (usiaNum > 90) usiaClass = 'pj-usia-red';
+      }
+    }
+
+    var ketHtml = item.keterangan
+      ? '<span class="pj-ket">' + escHtml(item.keterangan) + '</span>'
+      : '<span style="color:var(--text3)">—</span>';
+
+    return '<tr>'
+      + '<td><span class="pj-code">' + escHtml(item.code) + '</span></td>'
+      + '<td><span class="pj-name">' + escHtml(item.name || item.code) + '</span></td>'
+      + '<td class="pj-stok">' + item.stok + '</td>'
+      + '<td><span class="pj-date">' + escHtml(item.lastBuyDate || '—') + '</span></td>'
+      + '<td><span class="' + usiaClass + '">' + escHtml(item.usia || '—') + '</span></td>'
+      + '<td>' + ketHtml + '</td>'
+      + '</tr>';
+  }).join('');
+
+  return '<table class="pushjual-table">'
+    + '<thead><tr>'
+      + '<th>Kode</th>'
+      + '<th>Nama Barang</th>'
+      + '<th style="text-align:center">Stok</th>'
+      + '<th>Terakhir Beli</th>'
+      + '<th>Usia</th>'
+      + '<th>Keterangan</th>'
+    + '</tr></thead>'
+    + '<tbody>' + rows + '</tbody>'
+    + '</table>';
+}
 
 // ========================================
 // UTILS

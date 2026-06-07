@@ -504,6 +504,111 @@ function refreshReport(sheetName) {
 }
 
 // ============================================================
+// PUSH JUAL — SKU yang stok > 0 tapi pembelian terakhir < cutoff
+// ============================================================
+function getPushJualData(cutoffDate) {
+  try {
+    var cutoff = new Date(cutoffDate);
+    if (isNaN(cutoff.getTime())) {
+      return { success: false, error: 'Tanggal cutoff tidak valid.' };
+    }
+
+    // 1) Ambil peta pembelian terakhir per SKU
+    var lbResult = getLastPurchaseMap();
+    var lbMap = (lbResult && lbResult.success && lbResult.map) ? lbResult.map : {};
+
+    // 2) Baca kedua sheet Purchase NB dan Purchase PC
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheets = ['Purchase NB', 'Purchase PC'];
+    var result = { success: true, nb: [], pc: [] };
+    var now = new Date();
+
+    for (var si = 0; si < sheets.length; si++) {
+      var sheetName = sheets[si];
+      var sh = ss.getSheetByName(sheetName);
+      if (!sh) continue;
+
+      var lastRow = sh.getLastRow();
+      if (lastRow < CONFIG.DATA_START_ROW + 1) continue;
+
+      var data = sh.getRange(1, 1, lastRow, CONFIG.TOTAL_COLS).getValues();
+      var items = [];
+
+      for (var r = CONFIG.DATA_START_ROW; r < data.length; r++) {
+        var row = data[r];
+        var code = String(row[CONFIG.COL_CODE] || '').trim();
+        var name = String(row[CONFIG.COL_NAME] || '').trim();
+
+        if (!code) continue;
+        // Hanya produk (mengandung '-' atau '/')
+        var isProduct = code.includes('-') || code.includes('/');
+        if (!isProduct) continue;
+
+        // Stok > 0
+        var stok = toNum(row[CONFIG.COL_ALL_STOK_FULL]);
+        if (stok <= 0) continue;
+
+        // Cek riwayat beli
+        var codeUpper = code.toUpperCase();
+        var lb = lbMap[codeUpper] || null;
+
+        var lastBuyDate = '';
+        var usia = '';
+        var keterangan = '';
+
+        if (!lb || !lb.tanggal) {
+          // Tidak punya riwayat beli
+          keterangan = 'Copotan / Upgrade';
+        } else {
+          // Parse tanggal dd/MM/yyyy
+          var parts = lb.tanggal.split('/');
+          var buyDate = null;
+          if (parts.length === 3) {
+            buyDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+          }
+
+          if (!buyDate || isNaN(buyDate.getTime())) {
+            keterangan = 'Copotan / Upgrade';
+          } else if (buyDate >= cutoff) {
+            // Pembelian terakhir SETELAH cutoff → tidak masuk push jual
+            continue;
+          } else {
+            lastBuyDate = lb.tanggal;
+            // Hitung usia dalam hari
+            var diffMs = now.getTime() - buyDate.getTime();
+            var diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            if (diffDays >= 60) {
+              var diffMonths = Math.floor(diffDays / 30);
+              usia = diffMonths + ' bulan';
+            } else {
+              usia = diffDays + ' hari';
+            }
+          }
+        }
+
+        items.push({
+          code: code,
+          name: name,
+          stok: stok,
+          lastBuyDate: lastBuyDate,
+          usia: usia,
+          keterangan: keterangan
+        });
+      }
+
+      if (si === 0) result.nb = items;
+      else result.pc = items;
+    }
+
+    return result;
+
+  } catch (e) {
+    Logger.log('getPushJualData error: ' + e.toString());
+    return { success: false, error: e.toString() };
+  }
+}
+
+// ============================================================
 // HELPERS
 // ============================================================
 function toNum(v) {
