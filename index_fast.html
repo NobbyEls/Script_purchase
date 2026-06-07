@@ -1096,15 +1096,15 @@ function renderItemRow(item) {
         + '<span class="item-history-icon">⟶</span>'
       + '</button>'
     + '</td>'
-    /* ── STOK DETAIL ── */
-    + '<td class="val-sub'  +(subTotal===0?' val-zero':subTotal<0?' val-neg':'')+'">'+subTotal+'</td>'
+    /* ── STOK DETAIL (SUB TOTAL: hover → popup stok per cabang) ── */
+    + '<td class="td-allstok val-sub'  +(subTotal===0?' val-zero':subTotal<0?' val-neg':'')+'" data-stok="'+escHtml(stokDetail)+'">'+subTotal+'</td>'
     + '<td class="val-svc'  +(rusak===0?   ' val-zero':rusak<0?   ' val-neg':'')+'">'+rusak+'</td>'
     + '<td class="val-so'   +(so===0?      ' val-zero':so<0?      ' val-neg':'')+'">'+so+'</td>'
     + '<td class="val-dp'   +(dp===0?      ' val-zero':dp<0?      ' val-neg':'')+'">'+dp+'</td>'
     + '<td class="val-kk'   +(kk===0?      ' val-zero':kk<0?      ' val-neg':'')+'">'+kk+'</td>'
     + '<td class="val-pj'   +(pj===0?      ' val-zero':pj<0?      ' val-neg':'')+'">'+pj+'</td>'
-    /* ── ALL STOK (hover → popup stok per cabang) ── */
-    + '<td class="td-allstok val-stok'+(stok===0?' val-zero':stok<0?' val-neg':'')+'" data-stok="'+escHtml(stokDetail)+'">'+stok+'</td>'
+    /* ── ALL STOK ── */
+    + '<td class="val-stok'+(stok===0?' val-zero':stok<0?' val-neg':'')+'">'+stok+'</td>'
     /* ── ALL OUT (hover → popup detail cabang) ── */
     + '<td class="td-allout val-out'+(allOut===0?' val-zero':allOut<0?' val-neg':'')+'" data-out="'+escHtml(outDetail)+'">'+allOut+'</td>'
     + '<td class="val-out'+(outQty===0?' val-zero':outQty<0?' val-neg':'')+'">'+outQty+'</td>'
