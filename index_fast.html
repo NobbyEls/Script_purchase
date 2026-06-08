@@ -51,6 +51,8 @@
   .btn-refresh{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,var(--accent),#2563eb);border:1px solid var(--accent);border-radius:6px;color:#fff;font-family:var(--font);font-size:11px;font-weight:600;padding:5px 12px;cursor:pointer;transition:var(--transition);flex-shrink:0;box-shadow:0 2px 8px rgba(59,130,246,0.3);}
   .btn-refresh:hover{background:linear-gradient(135deg,#2563eb,#1d4ed8);box-shadow:0 4px 14px rgba(59,130,246,0.4);}
   .btn-refresh.spinning .refresh-icon{animation:spin 0.7s linear infinite;}
+  .btn-export{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#16a34a,#15803d);border:1px solid #16a34a;border-radius:6px;color:#fff;font-family:var(--font);font-size:11px;font-weight:600;padding:5px 12px;cursor:pointer;transition:var(--transition);flex-shrink:0;box-shadow:0 2px 8px rgba(22,163,74,0.3);}
+  .btn-export:hover{background:linear-gradient(135deg,#15803d,#166534);box-shadow:0 4px 14px rgba(22,163,74,0.4);}
   .refresh-icon{font-size:13px;display:inline-block;transition:var(--transition);}
   .topbar-end{display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0;}
   .sheet-tabs{display:flex;gap:4px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:3px;}
@@ -481,6 +483,9 @@
     <button class="btn-refresh" id="btn-refresh" onclick="doRefresh()">
       <span class="refresh-icon">↻</span> Update Data
     </button>
+    <button class="btn-export" id="btn-export" onclick="exportCurrentTab()" title="Export tabel ke Excel">
+      <span>↓</span> Export XLS
+    </button>
     <div class="badge-date" id="badge-date">— / — / —</div>
   </div>
 </div>
@@ -895,6 +900,180 @@ function doRefresh() {
     modal.classList.remove('show');
     alert('Update gagal: ' + err);
   });
+}
+
+// ========================================
+// EXPORT XLS — semua tab
+// ========================================
+function exportCurrentTab() {
+  try {
+    if (_pushJualActive) {
+      exportPushJual();
+    } else if (currentSheet) {
+      exportPurchaseSheet(currentSheet);
+    } else {
+      alert('Tidak ada data untuk di-export.');
+    }
+  } catch(e) {
+    alert('Gagal export: ' + e.message);
+  }
+}
+
+/* Export tabel Purchase NB / PC */
+function exportPurchaseSheet(sheetName) {
+  var payload = _preloaded[sheetName];
+  if (!payload || !payload.report || !payload.report.success) {
+    alert('Data ' + sheetName + ' belum siap.');
+    return;
+  }
+
+  var depts = payload.report.departments || [];
+  if (depts.length === 0) {
+    alert('Tidak ada data untuk di-export.');
+    return;
+  }
+
+  /* Ambil filter aktif (jika ada) supaya export sesuai yang user lihat */
+  var visibleCodes = {};
+  var hasFilter = false;
+  document.querySelectorAll('.report-table tbody tr').forEach(function(row){
+    if (row.style.display !== 'none') {
+      var code = row.dataset.code || '';
+      visibleCodes[code] = true;
+    } else {
+      hasFilter = true;
+    }
+  });
+
+  var headers = ['Departemen','Kode','Nama Barang',
+    'Sub Total','Rusak','SO','DP','KK','PJ','ALL STOK',
+    'YGY','SMG','SLO','PWT','BBS','TGL','MDN',
+    'ALL OUT','OUT QTY','Order +','Order -','KIRA2','KSG','PO','KEEP',
+    'Harga Beli','Tgl Beli','Harga Els'];
+
+  var rows = [];
+  depts.forEach(function(dept){
+    if (!dept.items) return;
+    dept.items.forEach(function(item){
+      /* Skip jika filter aktif & code tidak di visibleCodes */
+      var codeKey = (item.code || '').toLowerCase();
+      if (hasFilter && !visibleCodes[codeKey]) return;
+
+      var lb = lastBuyMap[String(item.code||'').toUpperCase()] || null;
+      var hargaBeli = lb && lb.harga ? lb.harga : '';
+      var tglBeli   = lb && lb.tanggal ? lb.tanggal : '';
+      var m = masterMap[String(item.code||'').toUpperCase()] || null;
+      var hargaEls = m && m.harga ? m.harga : '';
+
+      var stokC = item.stokCabang || {};
+      var outC  = item.outCabang  || {};
+      var CABANG = ['YGY','SMG','SLO','PWT','BBS','TGL','MDN'];
+
+      rows.push([
+        dept.name, item.code, item.name,
+        item.subTotal||0, item.rusak||0, item.so||0, item.dp||0, item.kk||0, item.pj||0, item.allStok||0,
+        stokC.YGY||0, stokC.SMG||0, stokC.SLO||0, stokC.PWT||0, stokC.BBS||0, stokC.TGL||0, stokC.MDN||0,
+        item.allOut||0, item.outQty||0, item.orderPlus||0, item.orderMinus||0,
+        item.ikira2||'', item.ketKsg||'', item.po||'', item.ketKeep||0,
+        hargaBeli, tglBeli, hargaEls
+      ]);
+    });
+  });
+
+  if (rows.length === 0) {
+    alert('Tidak ada data yang tampil untuk di-export.');
+    return;
+  }
+
+  var fname = sheetName.replace(/\s+/g,'_') + '_' + getDateStamp() + '.xls';
+  downloadXLS(headers, rows, sheetName, fname);
+}
+
+/* Export Push Jual: gabungan NB + PC dengan kolom Source */
+function exportPushJual() {
+  var nbItems = _pushJualData ? (_pushJualData.nb || []) : [];
+  var pcItems = _pushJualData ? (_pushJualData.pc || []) : [];
+
+  if (nbItems.length === 0 && pcItems.length === 0) {
+    alert('Tidak ada data Push Jual untuk di-export.');
+    return;
+  }
+
+  var headers = ['Source','Kode','Nama Barang','Stok','Terakhir Beli','Usia','Keterangan'];
+  var rows = [];
+
+  nbItems.forEach(function(item){
+    rows.push(['NB', item.code||'', item.name||'', item.stok||0,
+      item.lastBuyDate||'', item.usia||'', item.keterangan||'']);
+  });
+  pcItems.forEach(function(item){
+    rows.push(['PC', item.code||'', item.name||'', item.stok||0,
+      item.lastBuyDate||'', item.usia||'', item.keterangan||'']);
+  });
+
+  /* Tambahkan info filter bulan di nama file */
+  var monthLabel = '';
+  var sel = document.getElementById('pushjual-month-select');
+  if (sel) {
+    var opt = sel.options[sel.selectedIndex];
+    if (opt) monthLabel = '_' + opt.text.replace(/\s+/g,'-');
+  }
+
+  var fname = 'PushJual' + monthLabel + '_' + getDateStamp() + '.xls';
+  downloadXLS(headers, rows, 'Push Jual', fname);
+}
+
+/* Helper: timestamp untuk nama file */
+function getDateStamp() {
+  var d = new Date();
+  return d.getFullYear() + '-' +
+    String(d.getMonth()+1).padStart(2,'0') + '-' +
+    String(d.getDate()).padStart(2,'0') + '_' +
+    String(d.getHours()).padStart(2,'0') +
+    String(d.getMinutes()).padStart(2,'0');
+}
+
+/* Helper: build XLS file (HTML format yang dikenali Excel) dan trigger download */
+function downloadXLS(headers, rows, sheetTitle, fname) {
+  var headerHtml = '<tr>' + headers.map(function(h){
+    return '<th style="background:#1f2937;color:#fff;font-weight:bold;padding:6px;border:1px solid #555">'+escHtml(h)+'</th>';
+  }).join('') + '</tr>';
+
+  var bodyHtml = rows.map(function(row){
+    return '<tr>' + row.map(function(cell){
+      var v = (cell === null || cell === undefined) ? '' : cell;
+      var styleNum = (typeof v === 'number') ? ' style="mso-number-format:0"' : '';
+      return '<td'+styleNum+'>'+escHtml(String(v))+'</td>';
+    }).join('') + '</tr>';
+  }).join('');
+
+  var html =
+    '<html xmlns:o="urn:schemas-microsoft-com:office:office" '
+      + 'xmlns:x="urn:schemas-microsoft-com:office:excel" '
+      + 'xmlns="http://www.w3.org/TR/REC-html40">'
+    + '<head><meta charset="UTF-8">'
+      + '<!--[if gte mso 9]><xml>'
+        + '<x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>'
+          + '<x:Name>'+escHtml(sheetTitle.substring(0,31))+'</x:Name>'
+          + '<x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>'
+        + '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook>'
+      + '</xml><![endif]-->'
+    + '</head><body>'
+    + '<table border="1" style="border-collapse:collapse;font-family:Calibri;font-size:11pt">'
+    + '<thead>' + headerHtml + '</thead>'
+    + '<tbody>' + bodyHtml + '</tbody>'
+    + '</table></body></html>';
+
+  /* Tambah BOM untuk UTF-8 */
+  var blob = new Blob(['\uFEFF', html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = fname;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 100);
 }
 
 // ========================================
