@@ -429,10 +429,10 @@
   .pushjual-table-wrap{}
   .pushjual-table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;}
   .pushjual-table thead{position:sticky;top:36px;z-index:9;}
-  .pushjual-table th{padding:8px 10px;text-align:left;font-size:9.5px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap;border-bottom:2px solid var(--border2);background:var(--bg2);}
-  .pushjual-table th:first-child{padding-left:14px;}
-  .pushjual-table td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text2);font-size:11.5px;vertical-align:middle;}
-  .pushjual-table td:first-child{padding-left:14px;}
+  .pushjual-table th{padding:8px 8px;text-align:left;font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap;border-bottom:2px solid var(--border2);background:var(--bg2);}
+  .pushjual-table th:first-child{padding-left:12px;}
+  .pushjual-table td{padding:7px 8px;border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .pushjual-table td:first-child{padding-left:12px;}
   .pushjual-table tbody tr:hover{background:rgba(59,130,246,0.04);}
   .pushjual-table tbody tr:last-child td{border-bottom:none;}
   .pushjual-table .pj-code{font-family:var(--mono);font-size:10.5px;color:var(--accent2);}
@@ -442,10 +442,10 @@
   .pushjual-table .item-name-btn:hover .pj-name{color:var(--accent2);}
   .pushjual-table .item-name-btn:hover .item-history-icon{opacity:1;transform:translateX(0);}
   .pushjual-table .pj-stok{font-family:var(--mono);font-weight:600;color:var(--text1);text-align:center;}
-  .pushjual-table .pj-date{font-family:var(--mono);font-size:11px;color:var(--text3);}
-  .pushjual-table .pj-usia{font-family:var(--mono);font-size:11px;color:var(--text1);}
-  .pushjual-table .pj-usia-red{font-family:var(--mono);font-size:11px;color:var(--red);font-weight:600;}
-  .pushjual-table .pj-ket{font-size:10.5px;color:var(--amber);font-weight:600;}
+  .pushjual-table .pj-date{font-family:var(--mono);font-size:10.5px;color:var(--text3);white-space:nowrap;}
+  .pushjual-table .pj-usia{font-family:var(--mono);font-size:10.5px;color:var(--text1);white-space:nowrap;}
+  .pushjual-table .pj-usia-red{font-family:var(--mono);font-size:10.5px;color:var(--red);font-weight:600;white-space:nowrap;}
+  .pushjual-table .pj-ket{font-size:9.5px;color:var(--amber);font-weight:600;white-space:nowrap;display:block;overflow:hidden;text-overflow:ellipsis;}
   .pushjual-empty{text-align:center;padding:30px 20px;color:var(--text3);font-size:12px;}
   .pushjual-count{font-size:11px;color:var(--text3);font-family:var(--mono);margin-left:auto;}
 
@@ -2027,7 +2027,7 @@ function buildPushJualTable(items) {
   }).join('');
 
   return '<table class="pushjual-table">'
-    + '<colgroup><col style="width:auto"><col style="width:42px"><col style="width:80px"><col style="width:60px"><col style="width:140px"></colgroup>'
+    + '<colgroup><col style="width:auto"><col style="width:38px"><col style="width:72px"><col style="width:52px"><col style="width:170px"></colgroup>'
     + '<thead><tr>'
       + '<th>Nama Barang</th>'
       + '<th style="text-align:center">Stok</th>'
