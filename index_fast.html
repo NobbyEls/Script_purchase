@@ -81,7 +81,7 @@
   .progress-pct{color:var(--accent2);font-weight:700;font-size:16px;}
 
   /* ── DEPT ── */
-  .dept-section{margin-bottom:24px;animation:fadeUp 0.35s ease forwards;opacity:0;transform:translateY(12px);max-width:1400px;margin-left:auto;margin-right:auto;}
+  .dept-section{margin-bottom:24px;animation:fadeUp 0.35s ease forwards;opacity:0;transform:translateY(12px);max-width:1560px;margin-left:auto;margin-right:auto;}
   @keyframes fadeUp{to{opacity:1;transform:translateY(0);}}
   .dept-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:10px 16px;background:var(--card2);border:1px solid var(--border2);border-radius:var(--radius);border-left:3px solid var(--accent);}
   .dept-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;}
@@ -108,10 +108,10 @@
    * table-layout:fixed → lebar kolom ditentukan oleh <col>, bukan konten
    */
   .report-table{
-    width:1460px;
-    min-width:1460px;
+    width:1510px;
+    min-width:1510px;
     border-collapse:collapse;
-    font-size:11.5px;
+    font-size:13px;
     table-layout:fixed;
     font-family:'Calibri','Segoe UI',sans-serif;
   }
@@ -124,9 +124,9 @@
 
   /* ── TH umum ── */
   .report-table th{
-    padding:6px 4px;
+    padding:7px 5px;
     text-align:center;
-    font-size:9px;
+    font-size:10.5px;
     font-weight:600;
     color:var(--text3);
     text-transform:uppercase;
@@ -145,7 +145,7 @@
     padding-right:8px;
   }
 
-  .th-group{padding:5px 4px;font-size:9px;font-weight:600;letter-spacing:0.3px;}
+  .th-group{padding:6px 5px;font-size:10.5px;font-weight:600;letter-spacing:0.3px;}
   .th-group.blue  {color:var(--accent2);border-bottom:1px solid rgba(96,165,250,0.2);}
   .th-group.teal  {color:var(--teal);   border-bottom:1px solid rgba(20,184,166,0.2);}
   .th-group.amber {color:var(--amber);  border-bottom:1px solid rgba(245,158,11,0.2);}
@@ -157,12 +157,12 @@
   .report-table tbody tr:hover{background:rgba(59,130,246,0.04);}
 
   .report-table td{
-    padding:7px 4px;
+    padding:9px 5px;
     text-align:center;
     vertical-align:middle;
     border-right:1px solid var(--border);
     color:var(--text2);
-    font-size:11.5px;
+    font-size:13px;
     overflow:hidden;
     /* TIDAK set width di sini — dikendalikan <col> */
   }
@@ -189,7 +189,7 @@
     padding:0;
     color:var(--text1);
     font-family:var(--font);
-    font-size:11.5px;
+    font-size:13px;
     font-weight:500;
     transition:var(--transition);
     line-height:1.3;
@@ -214,7 +214,7 @@
   .item-code{
     display:block;
     font-family:var(--mono);
-    font-size:9.5px;
+    font-size:11px;
     color:var(--text3);
     margin-top:1px;
     white-space:nowrap;
@@ -430,27 +430,27 @@
   .pushjual-filter select{background:var(--card);border:1px solid var(--border);border-radius:5px;color:var(--text1);font-family:var(--font);font-size:12px;padding:6px 24px 6px 10px;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' fill='none' stroke='%2364748b' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;transition:var(--transition);}
   .pushjual-filter select:focus{border-color:var(--accent);background-color:var(--card2);}
   .pushjual-table-wrap{}
-  .pushjual-table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;font-family:'Calibri','Segoe UI',sans-serif;}
+  .pushjual-table{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed;font-family:'Calibri','Segoe UI',sans-serif;}
   /* Force semua font dalam tabel push jual jadi Calibri (override --mono) */
   .pushjual-table th, .pushjual-table td, .pushjual-table span, .pushjual-table button, .pushjual-table div{font-family:'Calibri','Segoe UI',sans-serif !important;}
   .pushjual-table thead{position:sticky;top:36px;z-index:9;}
-  .pushjual-table th{padding:8px 8px;text-align:left;font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap;border-bottom:2px solid var(--border2);background:var(--bg2);}
-  .pushjual-table th:first-child{padding-left:12px;}
-  .pushjual-table td{padding:7px 8px;border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .pushjual-table td:first-child{padding-left:12px;}
+  .pushjual-table th{padding:9px 10px;text-align:left;font-size:10.5px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap;border-bottom:2px solid var(--border2);background:var(--bg2);}
+  .pushjual-table th:first-child{padding-left:14px;}
+  .pushjual-table td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text2);font-size:12.5px;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .pushjual-table td:first-child{padding-left:14px;}
   .pushjual-table tbody tr:hover{background:rgba(59,130,246,0.04);}
   .pushjual-table tbody tr:last-child td{border-bottom:none;}
   .pushjual-table .pj-code{font-family:var(--mono);font-size:10.5px;color:var(--accent2);}
   .pushjual-table .pj-name{color:var(--text1);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:100%;}
-  .pushjual-table .item-name-btn{display:flex;align-items:center;gap:4px;background:none;border:none;cursor:pointer;text-align:left;width:100%;padding:0;color:var(--text1);font-family:var(--font);font-size:11px;font-weight:500;transition:var(--transition);line-height:1.3;min-width:0;overflow:hidden;}
+  .pushjual-table .item-name-btn{display:flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer;text-align:left;width:100%;padding:0;color:var(--text1);font-family:var(--font);font-size:12.5px;font-weight:500;transition:var(--transition);line-height:1.3;min-width:0;overflow:hidden;}
   .pushjual-table .item-name-btn .item-name-inner{flex:1;min-width:0;overflow:hidden;}
   .pushjual-table .item-name-btn:hover .pj-name{color:var(--accent2);}
   .pushjual-table .item-name-btn:hover .item-history-icon{opacity:1;transform:translateX(0);}
   .pushjual-table .pj-stok{font-family:var(--mono);font-weight:600;color:var(--text1);text-align:center;}
-  .pushjual-table .pj-date{font-family:var(--mono);font-size:10.5px;color:var(--text3);white-space:nowrap;}
-  .pushjual-table .pj-usia{font-family:var(--mono);font-size:10.5px;color:var(--text1);white-space:nowrap;}
-  .pushjual-table .pj-usia-red{font-family:var(--mono);font-size:10.5px;color:var(--red);font-weight:600;white-space:nowrap;}
-  .pushjual-table .pj-ket{font-size:9.5px;color:var(--amber);font-weight:600;white-space:nowrap;display:block;overflow:hidden;text-overflow:ellipsis;}
+  .pushjual-table .pj-date{font-family:var(--mono);font-size:12px;color:var(--text3);white-space:nowrap;}
+  .pushjual-table .pj-usia{font-family:var(--mono);font-size:12px;color:var(--text1);white-space:nowrap;}
+  .pushjual-table .pj-usia-red{font-family:var(--mono);font-size:12px;color:var(--red);font-weight:600;white-space:nowrap;}
+  .pushjual-table .pj-ket{font-size:11px;color:var(--amber);font-weight:600;white-space:nowrap;display:block;overflow:hidden;text-overflow:ellipsis;}
   .pushjual-empty{text-align:center;padding:30px 20px;color:var(--text3);font-size:12px;}
   .pushjual-count{font-size:11px;color:var(--text3);font-family:var(--mono);margin-left:auto;}
 
@@ -716,23 +716,23 @@ function applyPayload(sheetName, payload, opts){
  */
 var COL_WIDTHS = [
   360,        // 0  Nama Barang
-   52,        // 1  Sub Total
-   52,        // 2  Rusak
-   52,        // 3  SO
-   52,        // 4  DP
-   52,        // 5  KK
-   52,        // 6  PJ
-   58,        // 7  ALL STOK
-   58,        // 8  ALL OUT
-   54,        // 9  OUT QTY
-   54,        // 10 ORDER +
-   54,        // 11 ORDER -
-   58,        // 12 KIRA2
-   58,        // 13 KET KSG
-   52,        // 14 PO
-   52,        // 15 KEEP
-   96,        // 16 HARGA BELI
-   96         // 17 HARGA ELS
+   60,        // 1  Sub Total
+   60,        // 2  Rusak
+   60,        // 3  SO
+   60,        // 4  DP
+   60,        // 5  KK
+   60,        // 6  PJ
+   66,        // 7  ALL STOK
+   66,        // 8  ALL OUT
+   62,        // 9  OUT QTY
+   62,        // 10 ORDER +
+   62,        // 11 ORDER -
+   66,        // 12 KIRA2
+   66,        // 13 KET KSG
+   60,        // 14 PO
+   60,        // 15 KEEP
+  110,        // 16 HARGA BELI
+  110         // 17 HARGA ELS
 ];
 /* Total = 300+6×52+58+7×48+2×58+54+2×54+58+58+52+52
          = 300+312+58+336+116+54+108+58+58+52+52 = 1,454px
@@ -2032,7 +2032,7 @@ function buildPushJualTable(items) {
   }).join('');
 
   return '<table class="pushjual-table">'
-    + '<colgroup><col style="width:auto"><col style="width:42px"><col style="width:90px"><col style="width:72px"><col style="width:230px"></colgroup>'
+    + '<colgroup><col style="width:auto"><col style="width:50px"><col style="width:100px"><col style="width:80px"><col style="width:260px"></colgroup>'
     + '<thead><tr>'
       + '<th>Nama Barang</th>'
       + '<th style="text-align:center">Stok</th>'
