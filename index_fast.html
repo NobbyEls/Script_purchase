@@ -836,16 +836,17 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ========================================
-// REFRESH (tombol Update) — fetch ulang + modal progress
+// REFRESH (tombol Update) — fetch SEMUA sheet (NB + PC) sekaligus
 // ========================================
 function doRefresh() {
-  if (!currentSheet) return;
   var btn = document.getElementById('btn-refresh');
   btn.classList.add('spinning');
   btn.disabled = true;
   destroyObserver();
 
-  var sheetName = currentSheet;
+  /* Sheet yang akan di-update: SEMUA sheet yang ada di tabs (NB + PC) */
+  var sheets = ['Purchase NB', 'Purchase PC'];
+  var activeSheet = currentSheet || sheets[0];
 
   /* Tampilkan modal progress */
   var modal = document.getElementById('update-modal');
@@ -855,45 +856,70 @@ function doRefresh() {
   modal.classList.add('show');
   uFill.style.width = '0%'; uPct.textContent = '0%'; uStep.textContent = 'Menghubungi server...';
 
-  function uProgress(pct, text){
+  /* Total step: 4 per sheet × jumlah sheet (light start, light done, heavy start, heavy done) */
+  var totalSteps = sheets.length * 4;
+  var doneSteps = 0;
+  function step(text){
+    doneSteps++;
+    var pct = Math.min(100, Math.ceil((doneSteps / totalSteps) * 100 / 10) * 10);
     uFill.style.width = pct + '%';
     uPct.textContent  = pct + '%';
     uStep.textContent = text;
   }
 
-  uProgress(10, 'Mengambil data report...');
-  gsRun('getBundleLight', sheetName).then(function(light){
-    uProgress(40, 'Data report diterima...');
-    return gsRun('getBundleHeavy', sheetName).then(function(heavy){
-      uProgress(80, 'Data harga diterima...');
-      return {
-        report:   (light && light.report) || null,
-        statuses: (light && light.statuses) || [],
-        master:   (heavy && heavy.master) || null,
-        lastBuy:  (heavy && heavy.lastBuy) || null
-      };
+  /* Fetch semua sheet PARALEL */
+  var promises = sheets.map(function(s){
+    step('Mengambil data ' + s + '...');
+    return gsRun('getBundleLight', s).then(function(light){
+      step('Data ' + s + ' diterima');
+      step('Mengambil harga ' + s + '...');
+      return gsRun('getBundleHeavy', s).then(function(heavy){
+        step('Harga ' + s + ' diterima');
+        return {
+          sheet: s,
+          payload: {
+            report:   (light && light.report) || null,
+            statuses: (light && light.statuses) || [],
+            master:   (heavy && heavy.master) || null,
+            lastBuy:  (heavy && heavy.lastBuy) || null
+          }
+        };
+      });
     });
-  }).then(function(payload){
-    uProgress(100, 'Selesai!');
+  });
+
+  Promise.all(promises).then(function(results){
     btn.classList.remove('spinning');
     btn.disabled = false;
 
-    _preloaded[sheetName] = payload;
-
-    if (!payload || !payload.report || !payload.report.success){
-      setTimeout(function(){ modal.classList.remove('show'); }, 500);
-      alert('Update gagal: ' + ((payload && payload.report && payload.report.error) || 'data tidak tersedia'));
-      return;
-    }
+    /* Simpan semua payload + gabung lastBuyMap */
+    lastBuyMap = {};
+    results.forEach(function(r){
+      _preloaded[r.sheet] = r.payload;
+      if (r.payload.lastBuy && r.payload.lastBuy.success && r.payload.lastBuy.map){
+        var map = r.payload.lastBuy.map;
+        for (var k in map) { if (map.hasOwnProperty(k)) lastBuyMap[k] = map[k]; }
+      }
+    });
 
     /* Badge tanggal = waktu UPDATE selesai */
     var now  = new Date();
     var opts = {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'};
     document.getElementById('badge-date').textContent = now.toLocaleString('id-ID', opts);
 
-    applyPayload(sheetName, payload, { rebuildFilters:false });
+    /* Render: jika di tab Push Jual, re-render Push Jual; selain itu render sheet aktif */
+    if (_pushJualActive) {
+      renderPushJualView();
+    } else {
+      var activePayload = _preloaded[activeSheet];
+      if (activePayload && activePayload.report && activePayload.report.success){
+        applyPayload(activeSheet, activePayload, { rebuildFilters:false });
+      } else {
+        alert('Update gagal: data tidak tersedia');
+      }
+    }
 
-    setTimeout(function(){ modal.classList.remove('show'); }, 600);
+    setTimeout(function(){ modal.classList.remove('show'); }, 500);
   }).catch(function(err){
     btn.classList.remove('spinning');
     btn.disabled = false;
