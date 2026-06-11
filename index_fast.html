@@ -67,20 +67,12 @@
   body.light-mode .pushjual-table .pj-usia{color:#0f172a;}
   /* Hist modal di light mode */
   body.light-mode .modal-box{background:#e7ebf2;}
-  body.light-mode .hist-table thead tr,
-  body.light-mode .hist-table th{background:#d3d9e3 !important;}
 
   /* ── LIGHT MODE — semua font/teks jadi gelap (kecuali nilai minus tetap merah) ── */
   /* Topbar & brand */
   body.light-mode .brand-name,
   body.light-mode .brand-name span,
   body.light-mode .badge-date{color:#0f172a !important;}
-
-  /* Header tabel report (group-color) */
-  body.light-mode .th-group.blue,
-  body.light-mode .th-group.teal,
-  body.light-mode .th-group.amber,
-  body.light-mode .th-group.purple{color:#0f172a !important;}
 
   /* Harga di tabel report */
   body.light-mode .val-hbeli,
@@ -119,6 +111,47 @@
   body.light-mode .pushjual-table .pj-usia-red,
   body.light-mode .out-popup-val.neg,
   body.light-mode .stok-popup .out-popup-val.neg{color:var(--red) !important;}
+
+  /* ── LIGHT MODE — Kepala tabel (thead) berwarna GELAP ── */
+  /* Tabel report (Purchase NB / PC) — header utama + sticky clone */
+  body.light-mode .report-table thead tr:first-child th,
+  body.light-mode .thead-clone .report-table tr:first-child th{
+    background:#1e293b !important;
+    color:#cbd5e1 !important;
+    border-right-color:rgba(255,255,255,0.08) !important;
+  }
+  body.light-mode .report-table thead tr:last-child th,
+  body.light-mode .thead-clone .report-table tr:last-child th{
+    background:#0f172a !important;
+    color:#cbd5e1 !important;
+    border-right-color:rgba(255,255,255,0.08) !important;
+  }
+  /* Th-group accent: di atas background gelap, kembali ke warna aksen agar readable */
+  body.light-mode .th-group.blue  {color:var(--accent2) !important;}
+  body.light-mode .th-group.teal  {color:var(--teal)    !important;}
+  body.light-mode .th-group.amber {color:var(--amber)   !important;}
+  body.light-mode .th-group.purple{color:var(--purple)  !important;}
+
+  /* Modal Riwayat Pembelian — header tabel */
+  body.light-mode .hist-table thead tr,
+  body.light-mode .hist-table th{
+    background:#1e293b !important;
+    color:#cbd5e1 !important;
+    border-bottom-color:rgba(255,255,255,0.10) !important;
+  }
+
+  /* Push Jual — header tabel + panel header */
+  body.light-mode .pushjual-table thead tr,
+  body.light-mode .pushjual-table th{
+    background:#1e293b !important;
+    color:#cbd5e1 !important;
+    border-bottom-color:rgba(255,255,255,0.10) !important;
+  }
+  body.light-mode .pushjual-header{
+    background:#0f172a !important;
+    color:#f1f5f9 !important;
+    border-bottom-color:rgba(255,255,255,0.10) !important;
+  }
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:var(--font);background:var(--bg);color:var(--text1);min-height:100vh;font-size:14px;line-height:1.6;overflow-x:hidden;}
   body::before{content:'';position:fixed;top:-30%;left:-20%;width:700px;height:700px;background:radial-gradient(circle,rgba(59,130,246,0.06) 0%,transparent 70%);pointer-events:none;z-index:0;}
