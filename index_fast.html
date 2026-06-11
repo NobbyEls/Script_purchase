@@ -69,6 +69,56 @@
   body.light-mode .modal-box{background:#e7ebf2;}
   body.light-mode .hist-table thead tr,
   body.light-mode .hist-table th{background:#d3d9e3 !important;}
+
+  /* ── LIGHT MODE — semua font/teks jadi gelap (kecuali nilai minus tetap merah) ── */
+  /* Topbar & brand */
+  body.light-mode .brand-name,
+  body.light-mode .brand-name span,
+  body.light-mode .badge-date{color:#0f172a !important;}
+
+  /* Header tabel report (group-color) */
+  body.light-mode .th-group.blue,
+  body.light-mode .th-group.teal,
+  body.light-mode .th-group.amber,
+  body.light-mode .th-group.purple{color:#0f172a !important;}
+
+  /* Harga di tabel report */
+  body.light-mode .val-hbeli,
+  body.light-mode .val-hels{color:#0f172a !important;}
+
+  /* Modal riwayat pembelian */
+  body.light-mode .modal-subtitle,
+  body.light-mode .hist-qty,
+  body.light-mode .hist-price,
+  body.light-mode .hist-price-disc,
+  body.light-mode .hist-vendor{color:#0f172a !important;}
+
+  /* Tooltip nama barang */
+  body.light-mode .kiro-tooltip-name,
+  body.light-mode .kiro-tooltip-code{color:#0f172a !important;}
+
+  /* Popup OUT / STOK per cabang (nilai > 0) */
+  body.light-mode .out-popup-title,
+  body.light-mode .stok-popup-title,
+  body.light-mode .out-popup-val,
+  body.light-mode .stok-popup .out-popup-val{color:#0f172a !important;}
+  /* Nilai 0 di popup tetap abu */
+  body.light-mode .out-popup-val.zero{color:#94a3b8 !important;}
+
+  /* Push Jual */
+  body.light-mode .pushjual-table .pj-code,
+  body.light-mode .pushjual-table .pj-ket,
+  body.light-mode .pushjual-header{color:#0f172a !important;}
+
+  /* Item name (hover state tetap accent untuk feedback UX) */
+  body.light-mode .item-name-btn,
+  body.light-mode .pushjual-table .item-name-btn{color:#0f172a !important;}
+
+  /* ── PENGECUALIAN: nilai MINUS tetap merah ── */
+  body.light-mode .report-table td.val-neg,
+  body.light-mode .pushjual-table .pj-usia-red,
+  body.light-mode .out-popup-val.neg,
+  body.light-mode .stok-popup .out-popup-val.neg{color:var(--red) !important;}
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:var(--font);background:var(--bg);color:var(--text1);min-height:100vh;font-size:14px;line-height:1.6;overflow-x:hidden;}
   body::before{content:'';position:fixed;top:-30%;left:-20%;width:700px;height:700px;background:radial-gradient(circle,rgba(59,130,246,0.06) 0%,transparent 70%);pointer-events:none;z-index:0;}
