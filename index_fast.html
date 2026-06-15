@@ -823,11 +823,12 @@ function getMasterSheetName(purchaseSheet){
    ============================================================ */
 var _preloaded = {};   // { sheetName: payload } — data yang sudah di-fetch
 
-/* Fetch semua data 1 sheet dari server (dengan progress callback opsional) */
-function fetchAll(sheetName, onStep){
-  return gsRun('getBundleLight', sheetName).then(function(light){
+/* Fetch semua data 1 sheet dari server (dengan progress callback opsional)
+   forceFresh=true → bypass server-side cache (CacheService) */
+function fetchAll(sheetName, onStep, forceFresh){
+  return gsRun('getBundleLight', sheetName, !!forceFresh).then(function(light){
     if (onStep) onStep('Data ' + sheetName);
-    return gsRun('getBundleHeavy', sheetName).then(function(heavy){
+    return gsRun('getBundleHeavy', sheetName, !!forceFresh).then(function(heavy){
       if (onStep) onStep('Harga ' + sheetName);
       return {
         report:   (light && light.report) || null,
@@ -978,13 +979,14 @@ document.addEventListener('DOMContentLoaded', function() {
        Jadi 2 sheet × 5 = 10 steps */
     _totalSteps = sheets.length * 5;
 
-    /* Fetch SEMUA sheet secara paralel, update progress per tahap */
+    /* Fetch SEMUA sheet secara paralel, update progress per tahap.
+       Update Data: forceFresh=true → bypass server-side CacheService */
     var promises = sheets.map(function(s){
       updateProgress('Menghubungi server ' + s + '...');
-      return gsRun('getBundleLight', s).then(function(light){
+      return gsRun('getBundleLight', s, true).then(function(light){
         updateProgress('Menerima data ' + s);
         updateProgress('Memproses report ' + s);
-        return gsRun('getBundleHeavy', s).then(function(heavy){
+        return gsRun('getBundleHeavy', s, true).then(function(heavy){
           updateProgress('Menerima harga ' + s);
           updateProgress('Memproses harga ' + s);
           _preloaded[s] = {
@@ -1271,9 +1273,9 @@ function exportBeli() {
     return;
   }
 
-  var headers = ['Sumber','Departemen','Kode','Nama Barang','ALL STOK','OUT QTY','KIRA² Habis','PO Header','Harga Beli','Tgl Beli'];
+  var headers = ['Sumber','Departemen','Kode','Nama Barang','ALL STOK','ALL OUT','KIRA² Habis','PO Header','Harga Beli','Tgl Beli'];
   var rows = items.map(function(it){
-    return [it.source, it.dept, it.code, it.name, it.stokAll, it.outQty, it.kira2, it.poHeader, it.hargaBeli, it.hargaDate];
+    return [it.source, it.dept, it.code, it.name, it.stokAll, it.allOut, it.kira2, it.poHeader, it.hargaBeli, it.hargaDate];
   });
 
   var filterLabel = (_beliFilter === 'all') ? '' : ('_' + _beliFilter);
@@ -2645,7 +2647,7 @@ function filterBeliFromPreloaded(sheetName, sourceLabel) {
         name:        item.name || item.code,
         stokAll:     item.allStok || 0,
         stokPopup:   stokDetailArr.join('|'),
-        outQty:      item.outQty || 0,
+        allOut:      item.allOut || 0,
         kira2:       ikiraNum,
         poHeader:    poHeader,
         orderPlus:   item.orderPlus || 0,
@@ -2681,7 +2683,7 @@ function buildBeliTable(items) {
         + '</button>'
       + '</td>'
       + '<td class="td-allstok" data-stok="'+escHtml(it.stokPopup)+'"><span class="'+stokCls+'">'+it.stokAll+'</span></td>'
-      + '<td><span class="beli-num">'+(it.outQty||0)+'</span></td>'
+      + '<td><span class="beli-num">'+(it.allOut||0)+'</span></td>'
       + '<td><span class="beli-kira">'+it.kira2+'</span></td>'
       + '<td><span class="beli-po">'+it.poHeader+'</span></td>'
       + '<td>'+hargaCell+'</td>'
@@ -2694,7 +2696,7 @@ function buildBeliTable(items) {
       + '<col style="width:120px">'  /* Dept */
       + '<col style="width:auto">'   /* Nama */
       + '<col style="width:80px">'   /* Stok */
-      + '<col style="width:80px">'   /* Out Qty */
+      + '<col style="width:80px">'   /* All Out */
       + '<col style="width:90px">'   /* Kira² */
       + '<col style="width:80px">'   /* PO */
       + '<col style="width:140px">'  /* Harga Beli */
@@ -2704,7 +2706,7 @@ function buildBeliTable(items) {
       + '<th>Departemen</th>'
       + '<th>Nama Barang</th>'
       + '<th style="text-align:center">ALL STOK</th>'
-      + '<th style="text-align:center">OUT QTY</th>'
+      + '<th style="text-align:center">ALL OUT</th>'
       + '<th style="text-align:center">KIRA²</th>'
       + '<th style="text-align:center">PO</th>'
       + '<th style="text-align:right">Harga Beli</th>'

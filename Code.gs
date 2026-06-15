@@ -79,31 +79,126 @@ function doGet(e) {
 }
 
 // ============================================================
+// CACHE LAYER — bypass IMPORTRANGE re-evaluation
+// CacheService: max 100KB/key & 9MB total → kita chunk jadi 90KB.
+// Strategi:
+//  - TTL pendek (90-600 detik) supaya data tidak terlalu stale
+//  - Tombol "Update Data" pass forceFresh=true → bypass cache
+//  - Cache disimpan jika respons sukses (skip kalau ada error)
+// ============================================================
+const CACHE_VER = 'v2';   // bump ini saat shape data berubah
+
+function _cacheGet(key) {
+  try {
+    var cache = CacheService.getScriptCache();
+    var meta = cache.get(key + '__meta');
+    if (!meta) return null;
+    var info = JSON.parse(meta);
+    var keys = [];
+    for (var i = 0; i < info.n; i++) keys.push(key + '__' + i);
+    var got = cache.getAll(keys);
+    var parts = [];
+    for (var j = 0; j < info.n; j++) {
+      var v = got[key + '__' + j];
+      if (v == null) return null;   // ada chunk hilang → invalidate
+      parts.push(v);
+    }
+    return JSON.parse(parts.join(''));
+  } catch(e) {
+    Logger.log('cacheGet ' + key + ' error: ' + e.toString());
+    return null;
+  }
+}
+
+function _cachePut(key, obj, ttlSec) {
+  try {
+    var cache = CacheService.getScriptCache();
+    var json = JSON.stringify(obj);
+    var size = 90000;
+    var n = Math.ceil(json.length / size) || 1;
+    var batch = {};
+    for (var i = 0; i < n; i++) {
+      batch[key + '__' + i] = json.substring(i * size, (i + 1) * size);
+    }
+    batch[key + '__meta'] = JSON.stringify({ n: n, t: Date.now() });
+    cache.putAll(batch, ttlSec);
+  } catch(e) {
+    Logger.log('cachePut ' + key + ' error: ' + e.toString());
+  }
+}
+
+function _cacheBust(key) {
+  try {
+    var cache = CacheService.getScriptCache();
+    var meta = cache.get(key + '__meta');
+    if (!meta) return;
+    var info = JSON.parse(meta);
+    var keys = [key + '__meta'];
+    for (var i = 0; i < info.n; i++) keys.push(key + '__' + i);
+    cache.removeAll(keys);
+  } catch(e) {}
+}
+
+/* High-level wrapper: pakai cache atau fetch fresh */
+function _cached(key, ttlSec, forceFresh, fetcher) {
+  key = CACHE_VER + ':' + key;
+  if (forceFresh) {
+    _cacheBust(key);
+  } else {
+    var hit = _cacheGet(key);
+    if (hit !== null) return hit;
+  }
+  var fresh = fetcher();
+  if (fresh && fresh.success !== false) {
+    _cachePut(key, fresh, ttlSec);
+  }
+  return fresh;
+}
+
+/* Endpoint: bust SEMUA cache (dipanggil dari tombol "Update Data") */
+function bustAllCache() {
+  try {
+    var cache = CacheService.getScriptCache();
+    // Hapus per key yang kita tahu (CacheService tidak support wildcard)
+    var sheets = ['Purchase NB', 'Purchase PC'];
+    sheets.forEach(function(s) {
+      _cacheBust(CACHE_VER + ':rep_' + s);
+    });
+    _cacheBust(CACHE_VER + ':master_Master SKU NB');
+    _cacheBust(CACHE_VER + ':lastBuy');
+    return { success: true };
+  } catch(e) {
+    return { success: false, error: e.toString() };
+  }
+}
+
+// ============================================================
 // ENDPOINT GABUNGAN — dipecah 2 level agar tabel CEPAT tampil:
 // getBundleLight: report + status saja (sheet Purchase — ringan)
 // getBundleHeavy: master + harga beli (sheet Master + Vendor — berat)
 // getInitialData: getBundleLight + daftar sheet (buka app pertama kali)
 // ============================================================
-function getBundleLight(sheetName) {
+function getBundleLight(sheetName, forceFresh) {
   try {
-    const report   = getReportData(sheetName);
+    const report   = getReportData(sheetName, forceFresh);
     const statuses = (report && report.statuses) ? report.statuses : [];
     return {
       success:  report.success,
       report:   report,
-      statuses: statuses
+      statuses: statuses,
+      cached:   !!(report && report._fromCache)
     };
   } catch(e) {
     return { success: false, error: e.toString() };
   }
 }
 
-function getBundleHeavy(sheetName) {
+function getBundleHeavy(sheetName, forceFresh) {
   try {
     // Master SKU hanya untuk Purchase NB
     const masterName = /purchase\s*nb/i.test(String(sheetName || '')) ? 'Master SKU NB' : null;
-    const master  = masterName ? getMasterData(masterName) : null;
-    const lastBuy = getLastPurchaseMap();
+    const master  = masterName ? getMasterData(masterName, forceFresh) : null;
+    const lastBuy = getLastPurchaseMap(forceFresh);
     return {
       success: true,
       master:  master,
@@ -114,13 +209,13 @@ function getBundleHeavy(sheetName) {
   }
 }
 
-function getInitialData(sheetName) {
+function getInitialData(sheetName, forceFresh) {
   try {
     const sn = getSheetNames();
     const sheets = (sn.success && sn.sheets && sn.sheets.length > 0)
       ? sn.sheets : ['Purchase NB','Purchase PC'];
     const active = sheetName || sheets[0];
-    const bundle = getBundleLight(active);
+    const bundle = getBundleLight(active, forceFresh);
     bundle.sheets = sheets;
     bundle.activeSheet = active;
     return bundle;
@@ -148,9 +243,15 @@ function getSheetNames() {
 }
 
 // ============================================================
-// AMBIL DATA REPORT
+// AMBIL DATA REPORT  (dengan cache layer — TTL 90 detik)
 // ============================================================
-function getReportData(sheetName) {
+function getReportData(sheetName, forceFresh) {
+  return _cached('rep_' + sheetName, 90, forceFresh, function() {
+    return _getReportDataRaw(sheetName);
+  });
+}
+
+function _getReportDataRaw(sheetName) {
   try {
     const ss  = SpreadsheetApp.getActiveSpreadsheet();
     const sh  = ss.getSheetByName(sheetName);
@@ -280,9 +381,16 @@ function parseItem(row, code, name) {
 }
 
 // ============================================================
-// DATA MASTER SKU (untuk filter Type Laptop / Type Proc / Harga)
+// DATA MASTER SKU  (dengan cache layer — TTL 600 detik = 10 menit)
+// Master SKU jarang berubah, cocok di-cache lama
 // ============================================================
-function getMasterData(masterSheetName) {
+function getMasterData(masterSheetName, forceFresh) {
+  return _cached('master_' + masterSheetName, 600, forceFresh, function() {
+    return _getMasterDataRaw(masterSheetName);
+  });
+}
+
+function _getMasterDataRaw(masterSheetName) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sh = ss.getSheetByName(masterSheetName);
@@ -429,10 +537,16 @@ function getVendorHistory(itemCode) {
 }
 
 // ============================================================
-// PETA HARGA BELI TERAKHIR per SKU (dari sheet Cek Vendor)
-// Dipakai untuk kolom "Harga Terakhir Beli" di tabel.
+// PETA HARGA BELI TERAKHIR per SKU  (dengan cache — TTL 180 detik = 3 menit)
+// Cek Vendor sheet bisa cukup besar, dan jarang berubah dalam menit-an
 // ============================================================
-function getLastPurchaseMap() {
+function getLastPurchaseMap(forceFresh) {
+  return _cached('lastBuy', 180, forceFresh, function() {
+    return _getLastPurchaseMapRaw();
+  });
+}
+
+function _getLastPurchaseMapRaw() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const vendorSh = ss.getSheets().find(function(s) {
