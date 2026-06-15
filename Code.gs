@@ -48,7 +48,7 @@ const VENDOR_CONFIG = {
 
 // ============================================================
 // KONFIGURASI SHEET MASTER SKU (0-based index)
-// Master SKU NB -> kolom: A=Kode, C=Type Laptop, J=Type Proc, L=Harga
+// Master SKU NB -> kolom: A=Kode, C=Type Laptop, J=Type Proc, L=Harga, M=Note
 // ============================================================
 const MASTER_CONFIG = {
   COL_CODE:         0,   // A: Kode Barang (dicocokkan ke Purchase kolom B)
@@ -59,7 +59,8 @@ const MASTER_CONFIG = {
   COL_TYPE_PROC:    9,   // J: Type Proc
   COL_PROCESSOR:   10,   // K: Processor (Type Proc 2)
   COL_HARGA:       11,   // L: Harga (untuk range)
-  TOTAL_COLS:      12,   // Baca kolom A-L
+  COL_NOTE:        12,   // M: Note / Catatan per SKU
+  TOTAL_COLS:      13,   // Baca kolom A-M
   DATA_START_ROW:   1    // Index 1 = baris ke-2 (baris 1 = header)
 };
 
@@ -86,7 +87,7 @@ function doGet(e) {
 //  - Tombol "Update Data" pass forceFresh=true → bypass cache
 //  - Cache disimpan jika respons sukses (skip kalau ada error)
 // ============================================================
-const CACHE_VER = 'v2';   // bump ini saat shape data berubah
+const CACHE_VER = 'v3';   // bump ini saat shape data berubah
 
 function _cacheGet(key) {
   try {
@@ -427,6 +428,7 @@ function _getMasterDataRaw(masterSheetName) {
       // Size layar: ambil 3 karakter awal (mis. "15.6 inch" → "15.")
       const size       = String(row[MASTER_CONFIG.COL_SIZE]        || '').substring(0, 3).trim();
       const harga      = toNum(row[MASTER_CONFIG.COL_HARGA]);
+      const note       = String(row[MASTER_CONFIG.COL_NOTE]        || '').trim();
 
       map[code.toUpperCase()] = {
         typeLaptop: typeLaptop,
@@ -435,7 +437,8 @@ function _getMasterDataRaw(masterSheetName) {
         ram:        ram,
         storage:    storage,
         size:       size,
-        harga:      harga
+        harga:      harga,
+        note:       note
       };
 
       if (typeLaptop) laptopSet[typeLaptop] = true;

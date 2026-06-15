@@ -610,7 +610,7 @@
   .beli-count b{color:var(--accent2);font-weight:700;}
 
   .beli-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto;max-height:calc(100vh - 200px);overflow-y:auto;}
-  .beli-table{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed;font-family:'Calibri','Segoe UI',sans-serif;min-width:1180px;}
+  .beli-table{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed;font-family:'Calibri','Segoe UI',sans-serif;min-width:1430px;}
   .beli-table th, .beli-table td, .beli-table span, .beli-table button, .beli-table div{font-family:'Calibri','Segoe UI',sans-serif !important;}
   .beli-table thead{position:sticky;top:0;z-index:9;}
   .beli-table th{padding:9px 10px;text-align:left;font-size:10.5px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap;border-bottom:2px solid var(--border2);background:var(--bg2);}
@@ -645,6 +645,10 @@
   .beli-hbeli{font-family:var(--mono);color:#fbbf24;font-weight:500;text-align:right;white-space:nowrap;}
   body.light-mode .beli-hbeli{color:#b45309;}
   .beli-hbeli-date{font-family:var(--mono);font-size:9px;color:var(--text3);display:block;margin-top:1px;}
+  .beli-note{color:var(--text2);font-size:11.5px;font-style:italic;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+  .beli-note.empty{color:var(--text3);font-style:normal;opacity:0.5;}
+  body.light-mode .beli-note{color:#475569;}
+  body.light-mode .beli-note.empty{color:#94a3b8;}
 
   .beli-table .item-name-btn{display:flex;flex-direction:column;align-items:flex-start;background:none;border:none;cursor:pointer;text-align:left;width:100%;padding:0;color:var(--text1);font-family:var(--font);font-size:12.5px;font-weight:500;line-height:1.3;min-width:0;overflow:hidden;}
   .beli-table .item-name-btn:hover .beli-name{color:var(--accent2);}
@@ -1293,9 +1297,9 @@ function exportBeli() {
     return;
   }
 
-  var headers = ['Sumber','Departemen','Kode','Nama Barang','ALL STOK','ALL OUT','KIRA² Habis','ORDER (+)','ORDER (-)','Harga Beli','Tgl Beli'];
+  var headers = ['Sumber','Departemen','Kode','Nama Barang','ALL STOK','ALL OUT','KIRA² Habis','ORDER (+)','ORDER (-)','Harga Beli','Tgl Beli','Note'];
   var rows = items.map(function(it){
-    return [it.source, it.dept, it.code, it.name, it.stokAll, it.allOut, it.kira2, it.orderPlus, it.orderMinus, it.hargaBeli, it.hargaDate];
+    return [it.source, it.dept, it.code, it.name, it.stokAll, it.allOut, it.kira2, it.orderPlus, it.orderMinus, it.hargaBeli, it.hargaDate, it.note || ''];
   });
 
   var filterLabel = (_beliFilter === 'all') ? '' : ('_' + _beliFilter);
@@ -2622,6 +2626,8 @@ function filterBeliFromPreloaded(sheetName, sourceLabel) {
   if (!payload || !payload.report || !payload.report.departments) return [];
 
   var poHeader = getPOHeaderFromPreloaded(sheetName);
+  /* Master map untuk lookup Note kolom M (hanya tersedia untuk Purchase NB) */
+  var masterMap = (payload.master && payload.master.success && payload.master.map) ? payload.master.map : null;
   var items = [];
 
   payload.report.departments.forEach(function(dept) {
@@ -2656,6 +2662,13 @@ function filterBeliFromPreloaded(sheetName, sourceLabel) {
       var hargaBeli = (lb && lb.harga > 0) ? fmtRupiahJS(lb.harga) : '—';
       var hargaDate = (lb && lb.tanggal) ? lb.tanggal : '';
 
+      /* Note dari Master SKU (kolom M) — hanya untuk NB; PC kosong */
+      var note = '';
+      if (masterMap) {
+        var mEntry = masterMap[item.code.toUpperCase()];
+        if (mEntry && mEntry.note) note = String(mEntry.note);
+      }
+
       items.push({
         source:      sourceLabel,
         dept:        dept.name || '',
@@ -2669,7 +2682,8 @@ function filterBeliFromPreloaded(sheetName, sourceLabel) {
         orderPlus:   item.orderPlus || 0,
         orderMinus:  item.orderMinus || 0,
         hargaBeli:   hargaBeli,
-        hargaDate:   hargaDate
+        hargaDate:   hargaDate,
+        note:        note
       });
     });
   });
@@ -2704,6 +2718,7 @@ function buildBeliTable(items) {
       + '<td><span class="beli-order-p'+(it.orderPlus===0?' zero':'')+'">'+(it.orderPlus||0)+'</span></td>'
       + '<td><span class="beli-order-m'+(it.orderMinus===0?' zero':'')+'">'+(it.orderMinus||0)+'</span></td>'
       + '<td>'+hargaCell+'</td>'
+      + '<td title="'+escAttr(it.note||'')+'"><span class="beli-note'+(it.note?'':' empty')+'">'+escHtml(it.note||'—')+'</span></td>'
       + '</tr>';
   }).join('');
 
@@ -2718,6 +2733,7 @@ function buildBeliTable(items) {
       + '<col style="width:90px">'   /* Order + */
       + '<col style="width:90px">'   /* Order - */
       + '<col style="width:140px">'  /* Harga Beli */
+      + '<col style="width:240px">'  /* Note */
     + '</colgroup>'
     + '<thead><tr>'
       + '<th style="text-align:center">Sumber</th>'
@@ -2729,6 +2745,7 @@ function buildBeliTable(items) {
       + '<th style="text-align:center">ORDER (+)</th>'
       + '<th style="text-align:center">ORDER (-)</th>'
       + '<th style="text-align:right">Harga Beli</th>'
+      + '<th>Note</th>'
     + '</tr></thead>'
     + '<tbody>' + rows + '</tbody>'
     + '</table>';
