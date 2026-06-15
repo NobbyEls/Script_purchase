@@ -610,7 +610,7 @@
   .beli-count b{color:var(--accent2);font-weight:700;}
 
   .beli-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto;max-height:calc(100vh - 200px);overflow-y:auto;}
-  .beli-table{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed;font-family:'Calibri','Segoe UI',sans-serif;min-width:1430px;}
+  .beli-table{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed;font-family:'Calibri','Segoe UI',sans-serif;min-width:1550px;}
   .beli-table th, .beli-table td, .beli-table span, .beli-table button, .beli-table div{font-family:'Calibri','Segoe UI',sans-serif !important;}
   .beli-table thead{position:sticky;top:0;z-index:9;}
   .beli-table th{padding:9px 10px;text-align:left;font-size:10.5px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap;border-bottom:2px solid var(--border2);background:var(--bg2);}
@@ -645,10 +645,17 @@
   .beli-hbeli{font-family:var(--mono);color:#fbbf24;font-weight:500;text-align:right;white-space:nowrap;}
   body.light-mode .beli-hbeli{color:#b45309;}
   .beli-hbeli-date{font-family:var(--mono);font-size:9px;color:var(--text3);display:block;margin-top:1px;}
+  .beli-hels{font-family:var(--mono);color:#4ade80;font-weight:600;white-space:nowrap;}
+  body.light-mode .beli-hels{color:#15803d;}
   .beli-note{color:var(--text2);font-size:11.5px;font-style:italic;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
   .beli-note.empty{color:var(--text3);font-style:normal;opacity:0.5;}
   body.light-mode .beli-note{color:#475569;}
   body.light-mode .beli-note.empty{color:#94a3b8;}
+
+  /* Alignment helper — pasang di TH dan TD agar header sejajar dengan isi */
+  .beli-table .b-cen{text-align:center !important;}
+  .beli-table .b-rgt{text-align:right  !important;}
+  .beli-table .b-lft{text-align:left   !important;}
 
   .beli-table .item-name-btn{display:flex;flex-direction:column;align-items:flex-start;background:none;border:none;cursor:pointer;text-align:left;width:100%;padding:0;color:var(--text1);font-family:var(--font);font-size:12.5px;font-weight:500;line-height:1.3;min-width:0;overflow:hidden;}
   .beli-table .item-name-btn:hover .beli-name{color:var(--accent2);}
@@ -1297,9 +1304,9 @@ function exportBeli() {
     return;
   }
 
-  var headers = ['Sumber','Departemen','Kode','Nama Barang','ALL STOK','ALL OUT','KIRA² Habis','ORDER (+)','ORDER (-)','Harga Beli','Tgl Beli','Note'];
+  var headers = ['Sumber','Departemen','Kode','Nama Barang','ALL STOK','ALL OUT','KIRA² Habis','ORDER (+)','ORDER (-)','Harga Beli','Tgl Beli','Harga ELS','Note'];
   var rows = items.map(function(it){
-    return [it.source, it.dept, it.code, it.name, it.stokAll, it.allOut, it.kira2, it.orderPlus, it.orderMinus, it.hargaBeli, it.hargaDate, it.note || ''];
+    return [it.source, it.dept, it.code, it.name, it.stokAll, it.allOut, it.kira2, it.orderPlus, it.orderMinus, it.hargaBeli, it.hargaDate, (it.hargaEls>0?fmtRupiahJS(it.hargaEls):''), it.note || ''];
   });
 
   var filterLabel = (_beliFilter === 'all') ? '' : ('_' + _beliFilter);
@@ -2662,11 +2669,15 @@ function filterBeliFromPreloaded(sheetName, sourceLabel) {
       var hargaBeli = (lb && lb.harga > 0) ? fmtRupiahJS(lb.harga) : '—';
       var hargaDate = (lb && lb.tanggal) ? lb.tanggal : '';
 
-      /* Note dari Master SKU (kolom M) — hanya untuk NB; PC kosong */
+      /* Note + Harga ELS dari Master SKU (NB only). PC: kosong/0 */
       var note = '';
+      var hargaEls = 0;
       if (masterMap) {
         var mEntry = masterMap[item.code.toUpperCase()];
-        if (mEntry && mEntry.note) note = String(mEntry.note);
+        if (mEntry) {
+          if (mEntry.note) note = String(mEntry.note);
+          if (mEntry.harga > 0) hargaEls = mEntry.harga;
+        }
       }
 
       items.push({
@@ -2683,6 +2694,7 @@ function filterBeliFromPreloaded(sheetName, sourceLabel) {
         orderMinus:  item.orderMinus || 0,
         hargaBeli:   hargaBeli,
         hargaDate:   hargaDate,
+        hargaEls:    hargaEls,
         note:        note
       });
     });
@@ -2699,10 +2711,14 @@ function buildBeliTable(items) {
     var hargaCell = '<span class="beli-hbeli">'+escHtml(it.hargaBeli)+'</span>';
     if (it.hargaDate) hargaCell += '<span class="beli-hbeli-date">'+escHtml(it.hargaDate)+'</span>';
 
+    var hargaElsCell = (it.hargaEls > 0)
+      ? '<span class="beli-hels">'+escHtml(fmtRupiahJS(it.hargaEls))+'</span>'
+      : '<span class="beli-note empty">—</span>';
+
     return '<tr>'
-      + '<td><span class="beli-src '+srcClass+'">'+escHtml(it.source)+'</span></td>'
-      + '<td><span class="beli-dept">'+escHtml(it.dept)+'</span></td>'
-      + '<td>'
+      + '<td class="b-cen"><span class="beli-src '+srcClass+'">'+escHtml(it.source)+'</span></td>'
+      + '<td class="b-lft"><span class="beli-dept">'+escHtml(it.dept)+'</span></td>'
+      + '<td class="b-lft">'
         + '<button class="item-name-btn" '
           + 'onmouseenter="showTooltip(this)" onmouseleave="hideTooltip()" '
           + 'onmousemove="positionTooltip(event.clientX, event.clientY)" '
@@ -2712,13 +2728,14 @@ function buildBeliTable(items) {
           + '<span class="beli-code">'+escHtml(it.code)+'</span>'
         + '</button>'
       + '</td>'
-      + '<td class="td-allstok" data-stok="'+escHtml(it.stokPopup)+'"><span class="'+stokCls+'">'+it.stokAll+'</span></td>'
-      + '<td><span class="beli-num">'+(it.allOut||0)+'</span></td>'
-      + '<td><span class="beli-kira">'+it.kira2+'</span></td>'
-      + '<td><span class="beli-order-p'+(it.orderPlus===0?' zero':'')+'">'+(it.orderPlus||0)+'</span></td>'
-      + '<td><span class="beli-order-m'+(it.orderMinus===0?' zero':'')+'">'+(it.orderMinus||0)+'</span></td>'
-      + '<td>'+hargaCell+'</td>'
-      + '<td title="'+escAttr(it.note||'')+'"><span class="beli-note'+(it.note?'':' empty')+'">'+escHtml(it.note||'—')+'</span></td>'
+      + '<td class="b-cen td-allstok" data-stok="'+escHtml(it.stokPopup)+'"><span class="'+stokCls+'">'+it.stokAll+'</span></td>'
+      + '<td class="b-cen"><span class="beli-num">'+(it.allOut||0)+'</span></td>'
+      + '<td class="b-cen"><span class="beli-kira">'+it.kira2+'</span></td>'
+      + '<td class="b-cen"><span class="beli-order-p'+(it.orderPlus===0?' zero':'')+'">'+(it.orderPlus||0)+'</span></td>'
+      + '<td class="b-cen"><span class="beli-order-m'+(it.orderMinus===0?' zero':'')+'">'+(it.orderMinus||0)+'</span></td>'
+      + '<td class="b-rgt">'+hargaCell+'</td>'
+      + '<td class="b-rgt">'+hargaElsCell+'</td>'
+      + '<td class="b-lft" title="'+escAttr(it.note||'')+'"><span class="beli-note'+(it.note?'':' empty')+'">'+escHtml(it.note||'—')+'</span></td>'
       + '</tr>';
   }).join('');
 
@@ -2733,19 +2750,21 @@ function buildBeliTable(items) {
       + '<col style="width:90px">'   /* Order + */
       + '<col style="width:90px">'   /* Order - */
       + '<col style="width:140px">'  /* Harga Beli */
+      + '<col style="width:120px">'  /* Harga ELS */
       + '<col style="width:240px">'  /* Note */
     + '</colgroup>'
     + '<thead><tr>'
-      + '<th style="text-align:center">Sumber</th>'
-      + '<th>Departemen</th>'
-      + '<th>Nama Barang</th>'
-      + '<th style="text-align:center">ALL STOK</th>'
-      + '<th style="text-align:center">ALL OUT</th>'
-      + '<th style="text-align:center">KIRA²</th>'
-      + '<th style="text-align:center">ORDER (+)</th>'
-      + '<th style="text-align:center">ORDER (-)</th>'
-      + '<th style="text-align:right">Harga Beli</th>'
-      + '<th>Note</th>'
+      + '<th class="b-cen">Sumber</th>'
+      + '<th class="b-lft">Departemen</th>'
+      + '<th class="b-lft">Nama Barang</th>'
+      + '<th class="b-cen">ALL STOK</th>'
+      + '<th class="b-cen">ALL OUT</th>'
+      + '<th class="b-cen">KIRA²</th>'
+      + '<th class="b-cen">ORDER (+)</th>'
+      + '<th class="b-cen">ORDER (-)</th>'
+      + '<th class="b-rgt">Harga Beli</th>'
+      + '<th class="b-rgt">Harga ELS</th>'
+      + '<th class="b-lft">Note</th>'
     + '</tr></thead>'
     + '<tbody>' + rows + '</tbody>'
     + '</table>';
