@@ -87,7 +87,7 @@ function doGet(e) {
 //  - Tombol "Update Data" pass forceFresh=true → bypass cache
 //  - Cache disimpan jika respons sukses (skip kalau ada error)
 // ============================================================
-const CACHE_VER = 'v3';   // bump ini saat shape data berubah
+const CACHE_VER = 'v4';   // bump ini saat shape data berubah
 
 function _cacheGet(key) {
   try {
@@ -166,6 +166,7 @@ function bustAllCache() {
       _cacheBust(CACHE_VER + ':rep_' + s);
     });
     _cacheBust(CACHE_VER + ':master_Master SKU NB');
+    _cacheBust(CACHE_VER + ':master_Master SKU PC');
     _cacheBust(CACHE_VER + ':lastBuy');
     return { success: true };
   } catch(e) {
@@ -196,9 +197,15 @@ function getBundleLight(sheetName, forceFresh) {
 
 function getBundleHeavy(sheetName, forceFresh) {
   try {
-    // Master SKU hanya untuk Purchase NB
-    const masterName = /purchase\s*nb/i.test(String(sheetName || '')) ? 'Master SKU NB' : null;
-    const master  = masterName ? getMasterData(masterName, forceFresh) : null;
+    // Auto-detect master sheet:
+    //   "Purchase NB" → "Master SKU NB"
+    //   "Purchase PC" → "Master SKU PC" (kalau ada; kalau tidak ditemukan,
+    //                  getMasterData return success:false → master=null untuk PC)
+    var masterName = null;
+    var sn = String(sheetName || '');
+    if (/purchase\s*nb/i.test(sn))      masterName = 'Master SKU NB';
+    else if (/purchase\s*pc/i.test(sn)) masterName = 'Master SKU PC';
+    var master  = masterName ? getMasterData(masterName, forceFresh) : null;
     const lastBuy = getLastPurchaseMap(forceFresh);
     return {
       success: true,

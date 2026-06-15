@@ -377,6 +377,24 @@
   .td-harga  {white-space:nowrap;}
   .hbeli-date{display:block;font-family:var(--mono);font-size:8.5px;color:var(--text3);margin-top:1px;}
 
+  /* Kolom Note di tabel report Purchase NB/PC */
+  .report-table .td-note{
+    text-align:left !important;
+    padding-left:10px !important;
+    padding-right:10px !important;
+  }
+  .report-table .val-note{
+    display:block;
+    font-size:11.5px;
+    font-style:italic;
+    color:var(--text2);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    line-height:1.3;
+  }
+  body.light-mode .report-table .val-note{color:#475569;}
+
   /* ── Popup detail OUT per cabang (hover di ALL OUT) ── */
   .td-allout{cursor:default;position:relative;}
   .td-allstok{cursor:default;position:relative;}
@@ -948,7 +966,8 @@ var COL_WIDTHS = [
    60,        // 14 PO
    60,        // 15 KEEP
   110,        // 16 HARGA BELI
-  110         // 17 HARGA ELS
+  110,        // 17 HARGA ELS
+  240         // 18 NOTE
 ];
 /* Total = 300+6×52+58+7×48+2×58+54+2×54+58+58+52+52
          = 300+312+58+336+116+54+108+58+58+52+52 = 1,454px
@@ -1215,7 +1234,7 @@ function exportPurchaseSheet(sheetName) {
     'Sub Total','Rusak','SO','DP','KK','PJ','ALL STOK',
     'YGY','SMG','SLO','PWT','BBS','TGL','MDN',
     'ALL OUT','OUT QTY','Order +','Order -','KIRA2','KSG','PO','KEEP',
-    'Harga Beli','Tgl Beli','Harga Els'];
+    'Harga Beli','Tgl Beli','Harga Els','Note'];
 
   var rows = [];
   depts.forEach(function(dept){
@@ -1230,6 +1249,7 @@ function exportPurchaseSheet(sheetName) {
       var tglBeli   = lb && lb.tanggal ? lb.tanggal : '';
       var m = masterMap[String(item.code||'').toUpperCase()] || null;
       var hargaEls = m && m.harga ? m.harga : '';
+      var noteVal  = m && m.note  ? m.note  : '';
 
       var stokC = item.stokCabang || {};
       var outC  = item.outCabang  || {};
@@ -1241,7 +1261,7 @@ function exportPurchaseSheet(sheetName) {
         stokC.YGY||0, stokC.SMG||0, stokC.SLO||0, stokC.PWT||0, stokC.BBS||0, stokC.TGL||0, stokC.MDN||0,
         item.allOut||0, item.outQty||0, item.orderPlus||0, item.orderMinus||0,
         item.ikira2||'', item.ketKsg||'', item.po||'', item.ketKeep||0,
-        hargaBeli, tglBeli, hargaEls
+        hargaBeli, tglBeli, hargaEls, noteVal
       ]);
     });
   });
@@ -1518,6 +1538,7 @@ function renderDept(dept) {
             + '<th colspan="1" class="th-group purple">KEEP</th>'
             + '<th colspan="1" class="th-group" style="color:#fbbf24;border-bottom:1px solid rgba(251,191,36,0.2)">HARGA BELI</th>'
             + '<th colspan="1" class="th-group" style="color:#4ade80;border-bottom:1px solid rgba(74,222,128,0.2)">HARGA ELS</th>'
+            + '<th rowspan="2" class="th-group" style="color:#94a3b8;border-bottom:1px solid rgba(148,163,184,0.2);text-align:left;padding-left:10px">NOTE</th>'
           + '</tr>'
           /* ── Row 2: Sub headers ── */
           + '<tr>'
@@ -1593,6 +1614,7 @@ function renderItemRow(item) {
   var dStorage    = m ? (m.storage    || '') : '';
   var dSize       = m ? (m.size       || '') : '';
   var dHarga      = m ? (m.harga      || '') : '';
+  var dNote       = m ? (m.note       || '') : '';
 
   /* Harga Els = harga dari Master SKU (kolom L) */
   var hargaEls = (m && m.harga) ? m.harga : 0;
@@ -1663,6 +1685,9 @@ function renderItemRow(item) {
     + '<td class="val-ket'+(keepVal===0?' val-zero':'')+'">'+keepVal+'</td>'
     + '<td class="td-harga">'+hargaBeliHtml+'</td>'
     + '<td class="td-harga">'+hargaElsHtml+'</td>'
+    + '<td class="td-note" title="'+escAttr(dNote)+'">'
+      + (dNote ? '<span class="val-note">'+escHtml(dNote)+'</span>' : '<span class="val-zero">—</span>')
+    + '</td>'
     + '</tr>';
 }
 
