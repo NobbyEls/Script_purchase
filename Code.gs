@@ -65,6 +65,17 @@ const MASTER_CONFIG = {
 };
 
 // ============================================================
+// KONFIGURASI SHEET MASTER SKU PC (struktur lebih simple dari NB)
+// Master SKU PC -> kolom: A=Kode, I=Harga ELS
+// ============================================================
+const MASTER_PC_CONFIG = {
+  COL_CODE:         0,   // A: Kode
+  COL_HARGA:        8,   // I: Harga ELS
+  TOTAL_COLS:       9,   // Baca kolom A-I
+  DATA_START_ROW:   1    // Baris 1 = header, data mulai baris 2
+};
+
+// ============================================================
 // WEB APP ENTRY
 // 2 versi dalam 1 app:
 //   ?mode=cache -> versi dengan in-memory cache (index_cache.html)
@@ -87,7 +98,7 @@ function doGet(e) {
 //  - Tombol "Update Data" pass forceFresh=true → bypass cache
 //  - Cache disimpan jika respons sukses (skip kalau ada error)
 // ============================================================
-const CACHE_VER = 'v4';   // bump ini saat shape data berubah
+const CACHE_VER = 'v5';   // bump ini saat shape data berubah
 
 function _cacheGet(key) {
   try {
@@ -400,16 +411,22 @@ function getMasterData(masterSheetName, forceFresh) {
 
 function _getMasterDataRaw(masterSheetName) {
   try {
+    // Auto-detect schema: Master SKU PC pakai struktur sederhana (A=Kode, I=Harga)
+    const isPC = /master\s*sku\s*pc/i.test(String(masterSheetName));
+    const cfg  = isPC ? MASTER_PC_CONFIG : MASTER_CONFIG;
+
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sh = ss.getSheetByName(masterSheetName);
     if (!sh) return { success: false, error: 'Sheet "' + masterSheetName + '" tidak ditemukan.' };
 
     const lastRow = sh.getLastRow();
     if (lastRow < 2) {
-      return { success: true, map: {}, typeLaptops: [], typeProcs: [], priceMin: 0, priceMax: 0 };
+      return { success: true, map: {}, typeLaptops: [], typeProcs: [],
+               processors: [], rams: [], storages: [], sizes: [],
+               priceMin: 0, priceMax: 0 };
     }
 
-    const data = sh.getRange(1, 1, lastRow, MASTER_CONFIG.TOTAL_COLS).getValues();
+    const data = sh.getRange(1, 1, lastRow, cfg.TOTAL_COLS).getValues();
 
     const map       = {};
     const laptopSet = {};
@@ -420,40 +437,56 @@ function _getMasterDataRaw(masterSheetName) {
     const sizeSet   = {};
     let priceMin = Infinity, priceMax = -Infinity;
 
-    for (let r = MASTER_CONFIG.DATA_START_ROW; r < data.length; r++) {
+    for (let r = cfg.DATA_START_ROW; r < data.length; r++) {
       const row  = data[r];
-      const code = String(row[MASTER_CONFIG.COL_CODE] || '').trim();
+      const code = String(row[cfg.COL_CODE] || '').trim();
       // Lewati baris kosong / baris departemen (tanpa '-' & '/')
       if (!code || (code.indexOf('-') === -1 && code.indexOf('/') === -1)) continue;
 
-      const typeLaptop = String(row[MASTER_CONFIG.COL_TYPE_LAPTOP] || '').trim();
-      const typeProc   = String(row[MASTER_CONFIG.COL_TYPE_PROC]   || '').trim();
-      const processor  = String(row[MASTER_CONFIG.COL_PROCESSOR]   || '').trim();
-      // RAM: ambil 5 karakter awal dari sumber data (mis. "16GB DDR4 ..." → "16GB ")
-      const ram        = String(row[MASTER_CONFIG.COL_RAM]         || '').substring(0, 5).trim();
-      const storage    = String(row[MASTER_CONFIG.COL_STORAGE]     || '').trim();
-      // Size layar: ambil 3 karakter awal (mis. "15.6 inch" → "15.")
-      const size       = String(row[MASTER_CONFIG.COL_SIZE]        || '').substring(0, 3).trim();
-      const harga      = toNum(row[MASTER_CONFIG.COL_HARGA]);
-      const note       = String(row[MASTER_CONFIG.COL_NOTE]        || '').trim();
+      const harga = toNum(row[cfg.COL_HARGA]);
 
-      map[code.toUpperCase()] = {
-        typeLaptop: typeLaptop,
-        typeProc:   typeProc,
-        processor:  processor,
-        ram:        ram,
-        storage:    storage,
-        size:       size,
-        harga:      harga,
-        note:       note
-      };
+      let entry;
+      if (isPC) {
+        // Master SKU PC: hanya Kode + Harga (filter NB-only tidak relevan utk PC)
+        entry = {
+          typeLaptop: '', typeProc: '', processor: '',
+          ram:        '', storage:  '', size:      '',
+          harga:      harga,
+          note:       ''
+        };
+      } else {
+        // Master SKU NB: full schema
+        const typeLaptop = String(row[MASTER_CONFIG.COL_TYPE_LAPTOP] || '').trim();
+        const typeProc   = String(row[MASTER_CONFIG.COL_TYPE_PROC]   || '').trim();
+        const processor  = String(row[MASTER_CONFIG.COL_PROCESSOR]   || '').trim();
+        // RAM: ambil 5 karakter awal dari sumber data (mis. "16GB DDR4 ..." → "16GB ")
+        const ram        = String(row[MASTER_CONFIG.COL_RAM]         || '').substring(0, 5).trim();
+        const storage    = String(row[MASTER_CONFIG.COL_STORAGE]     || '').trim();
+        // Size layar: ambil 3 karakter awal (mis. "15.6 inch" → "15.")
+        const size       = String(row[MASTER_CONFIG.COL_SIZE]        || '').substring(0, 3).trim();
+        const note       = String(row[MASTER_CONFIG.COL_NOTE]        || '').trim();
 
-      if (typeLaptop) laptopSet[typeLaptop] = true;
-      if (typeProc)   procSet[typeProc]     = true;
-      if (processor)  processorSet[processor] = true;
-      if (ram)        ramSet[ram]           = true;
-      if (storage)    storageSet[storage]   = true;
-      if (size)       sizeSet[size]         = true;
+        entry = {
+          typeLaptop: typeLaptop,
+          typeProc:   typeProc,
+          processor:  processor,
+          ram:        ram,
+          storage:    storage,
+          size:       size,
+          harga:      harga,
+          note:       note
+        };
+
+        if (typeLaptop) laptopSet[typeLaptop] = true;
+        if (typeProc)   procSet[typeProc]     = true;
+        if (processor)  processorSet[processor] = true;
+        if (ram)        ramSet[ram]           = true;
+        if (storage)    storageSet[storage]   = true;
+        if (size)       sizeSet[size]         = true;
+      }
+
+      map[code.toUpperCase()] = entry;
+
       if (harga > 0) {
         if (harga < priceMin) priceMin = harga;
         if (harga > priceMax) priceMax = harga;
