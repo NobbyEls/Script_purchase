@@ -530,6 +530,20 @@
   .filter-select:hover{border-color:var(--border2);}
   .filter-select:focus{border-color:var(--accent);background-color:var(--card2);}
 
+  /* Input number untuk filter harga (manual min / max) */
+  .filter-input{
+    background:var(--card);border:1px solid var(--border);border-radius:5px;
+    color:var(--text1);font-family:var(--mono);font-size:11px;
+    padding:4px 7px;outline:none;width:100px;
+    transition:var(--transition);
+    -moz-appearance:textfield;
+  }
+  .filter-input::-webkit-outer-spin-button,
+  .filter-input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+  .filter-input::placeholder{color:var(--text3);font-family:var(--font);}
+  .filter-input:hover{border-color:var(--border2);}
+  .filter-input:focus{border-color:var(--accent);background-color:var(--card2);}
+
   .filter-reset{display:inline-flex;align-items:center;gap:4px;background:var(--card2);border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-family:var(--font);font-size:10px;font-weight:500;padding:5px 10px;cursor:pointer;transition:var(--transition);flex-shrink:0;}
   .filter-reset:hover{background:var(--red-glow);border-color:rgba(239,68,68,0.3);color:var(--red);}
   .filter-count{display:none;}  /* disembunyikan */
@@ -707,11 +721,11 @@
   </div>
   <div class="filter-group filter-nb-only">
     <label class="filter-label">Harga Minimum</label>
-    <select class="filter-select" id="filter-price-min"><option value="">Semua</option></select>
+    <input type="number" class="filter-input" id="filter-price-min" placeholder="Min" min="0" step="100000" inputmode="numeric">
   </div>
   <div class="filter-group filter-nb-only">
     <label class="filter-label">Harga Maksimum</label>
-    <select class="filter-select" id="filter-price-max"><option value="">Semua</option></select>
+    <input type="number" class="filter-input" id="filter-price-max" placeholder="Max" min="0" step="100000" inputmode="numeric">
   </div>
   <button class="filter-reset" onclick="resetFilters()">↺ Reset</button>
   <div class="filter-count" id="filter-count"></div>
@@ -2046,22 +2060,17 @@ function buildFilterControls(){
     return '<option value="'+escHtml(v)+'">'+escHtml(v)+'</option>';
   }).join('');
 
-  /* Dropdown harga: kelipatan 1 juta, dari 3 juta s/d 20 juta */
-  var priceMinSel = document.getElementById('filter-price-min');
-  var priceMaxSel = document.getElementById('filter-price-max');
-  var priceOpts = '';
-  for (var jt = 3; jt <= 20; jt++) {
-    var val = jt * 1000000;
-    priceOpts += '<option value="'+val+'">Rp'+jt+' Juta</option>';
-  }
-  priceMinSel.innerHTML = '<option value="">Semua</option>' + priceOpts;
-  priceMaxSel.innerHTML = '<option value="">Semua</option>' + priceOpts;
+  /* Filter harga: input number manual (min/max) — kosongkan saat sheet diganti */
+  var priceMinEl = document.getElementById('filter-price-min');
+  var priceMaxEl = document.getElementById('filter-price-max');
+  if (priceMinEl) priceMinEl.value = '';
+  if (priceMaxEl) priceMaxEl.value = '';
 }
 
 /* Pasang listener kontrol filter (sekali saja, saat init) */
 function initFilters(){
-  var priceMinSel = document.getElementById('filter-price-min');
-  var priceMaxSel = document.getElementById('filter-price-max');
+  var priceMinEl = document.getElementById('filter-price-min');
+  var priceMaxEl = document.getElementById('filter-price-max');
   var lSel  = document.getElementById('filter-type-laptop');
   var pSel  = document.getElementById('filter-type-proc');
   var procSel = document.getElementById('filter-processor');
@@ -2070,8 +2079,9 @@ function initFilters(){
   var sizSel  = document.getElementById('filter-size');
   var deptSel = document.getElementById('filter-dept');
 
-  priceMinSel.addEventListener('change', applyFilters);
-  priceMaxSel.addEventListener('change', applyFilters);
+  /* Input harga: pakai 'input' event supaya realtime saat user mengetik */
+  if (priceMinEl) priceMinEl.addEventListener('input', applyFilters);
+  if (priceMaxEl) priceMaxEl.addEventListener('input', applyFilters);
   lSel.addEventListener('change', applyFilters);
   pSel.addEventListener('change', applyFilters);
   procSel.addEventListener('change', applyFilters);

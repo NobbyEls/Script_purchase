@@ -421,9 +421,11 @@ function _getMasterDataRaw(masterSheetName) {
       const typeLaptop = String(row[MASTER_CONFIG.COL_TYPE_LAPTOP] || '').trim();
       const typeProc   = String(row[MASTER_CONFIG.COL_TYPE_PROC]   || '').trim();
       const processor  = String(row[MASTER_CONFIG.COL_PROCESSOR]   || '').trim();
-      const ram        = String(row[MASTER_CONFIG.COL_RAM]         || '').trim();
+      // RAM: ambil 5 karakter awal dari sumber data (mis. "16GB DDR4 ..." → "16GB ")
+      const ram        = String(row[MASTER_CONFIG.COL_RAM]         || '').substring(0, 5).trim();
       const storage    = String(row[MASTER_CONFIG.COL_STORAGE]     || '').trim();
-      const size       = String(row[MASTER_CONFIG.COL_SIZE]        || '').trim();
+      // Size layar: ambil 3 karakter awal (mis. "15.6 inch" → "15.")
+      const size       = String(row[MASTER_CONFIG.COL_SIZE]        || '').substring(0, 3).trim();
       const harga      = toNum(row[MASTER_CONFIG.COL_HARGA]);
 
       map[code.toUpperCase()] = {
@@ -459,7 +461,13 @@ function _getMasterDataRaw(masterSheetName) {
       processors:  Object.keys(processorSet).sort(),
       rams:        Object.keys(ramSet).sort(),
       storages:    Object.keys(storageSet).sort(),
-      sizes:       Object.keys(sizeSet).sort(),
+      // Size layar: sort numerik kecil → besar (parse value, bukan string compare)
+      sizes:       Object.keys(sizeSet).sort(function(a, b){
+                     var na = parseFloat(a) || 0;
+                     var nb = parseFloat(b) || 0;
+                     if (na !== nb) return na - nb;
+                     return a.localeCompare(b);
+                   }),
       priceMin:    priceMin,
       priceMax:    priceMax
     };
