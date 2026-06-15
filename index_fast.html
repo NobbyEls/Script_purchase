@@ -622,6 +622,12 @@
   .beli-kira{font-family:var(--mono);font-weight:700;color:var(--amber);text-align:center;font-size:13px;}
   body.light-mode .beli-kira{color:#b45309;}
   .beli-po{font-family:var(--mono);font-size:11.5px;color:var(--text3);text-align:center;}
+  .beli-order-p{font-family:var(--mono);font-weight:600;color:var(--green);text-align:center;}
+  .beli-order-m{font-family:var(--mono);font-weight:600;color:var(--red);text-align:center;}
+  .beli-order-p.zero,.beli-order-m.zero{color:var(--text3);font-weight:500;}
+  body.light-mode .beli-order-p{color:#15803d;}
+  body.light-mode .beli-order-m{color:#b91c1c;}
+  body.light-mode .beli-order-p.zero,body.light-mode .beli-order-m.zero{color:#94a3b8;}
   .beli-hbeli{font-family:var(--mono);color:#fbbf24;font-weight:500;text-align:right;white-space:nowrap;}
   body.light-mode .beli-hbeli{color:#b45309;}
   .beli-hbeli-date{font-family:var(--mono);font-size:9px;color:var(--text3);display:block;margin-top:1px;}
@@ -1273,9 +1279,9 @@ function exportBeli() {
     return;
   }
 
-  var headers = ['Sumber','Departemen','Kode','Nama Barang','ALL STOK','ALL OUT','KIRA² Habis','PO Header','Harga Beli','Tgl Beli'];
+  var headers = ['Sumber','Departemen','Kode','Nama Barang','ALL STOK','ALL OUT','KIRA² Habis','ORDER (+)','ORDER (-)','Harga Beli','Tgl Beli'];
   var rows = items.map(function(it){
-    return [it.source, it.dept, it.code, it.name, it.stokAll, it.allOut, it.kira2, it.poHeader, it.hargaBeli, it.hargaDate];
+    return [it.source, it.dept, it.code, it.name, it.stokAll, it.allOut, it.kira2, it.orderPlus, it.orderMinus, it.hargaBeli, it.hargaDate];
   });
 
   var filterLabel = (_beliFilter === 'all') ? '' : ('_' + _beliFilter);
@@ -2685,7 +2691,8 @@ function buildBeliTable(items) {
       + '<td class="td-allstok" data-stok="'+escHtml(it.stokPopup)+'"><span class="'+stokCls+'">'+it.stokAll+'</span></td>'
       + '<td><span class="beli-num">'+(it.allOut||0)+'</span></td>'
       + '<td><span class="beli-kira">'+it.kira2+'</span></td>'
-      + '<td><span class="beli-po">'+it.poHeader+'</span></td>'
+      + '<td><span class="beli-order-p'+(it.orderPlus===0?' zero':'')+'">'+(it.orderPlus||0)+'</span></td>'
+      + '<td><span class="beli-order-m'+(it.orderMinus===0?' zero':'')+'">'+(it.orderMinus||0)+'</span></td>'
       + '<td>'+hargaCell+'</td>'
       + '</tr>';
   }).join('');
@@ -2698,7 +2705,8 @@ function buildBeliTable(items) {
       + '<col style="width:80px">'   /* Stok */
       + '<col style="width:80px">'   /* All Out */
       + '<col style="width:90px">'   /* Kira² */
-      + '<col style="width:80px">'   /* PO */
+      + '<col style="width:90px">'   /* Order + */
+      + '<col style="width:90px">'   /* Order - */
       + '<col style="width:140px">'  /* Harga Beli */
     + '</colgroup>'
     + '<thead><tr>'
@@ -2708,7 +2716,8 @@ function buildBeliTable(items) {
       + '<th style="text-align:center">ALL STOK</th>'
       + '<th style="text-align:center">ALL OUT</th>'
       + '<th style="text-align:center">KIRA²</th>'
-      + '<th style="text-align:center">PO</th>'
+      + '<th style="text-align:center">ORDER (+)</th>'
+      + '<th style="text-align:center">ORDER (-)</th>'
       + '<th style="text-align:right">Harga Beli</th>'
     + '</tr></thead>'
     + '<tbody>' + rows + '</tbody>'
