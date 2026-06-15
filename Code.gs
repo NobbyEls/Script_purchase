@@ -172,6 +172,21 @@ function getReportData(sheetName) {
       if (sv) statuses.push(sv);
     }
 
+    // PO header (mis: "PO : 21 Hari") — di baris 1, kolom Y (24) ke kanan.
+    // Cell bisa terpisah: Y1="PO :", Z1=21, AA1="Hari"
+    // Atau jadi satu cell: "PO : 21 Hari" (merged)
+    // → scan kolom 24-30, ambil angka pertama yang ditemukan.
+    let poHeader = 0;
+    for (let pc = 24; pc <= Math.min(30, statusRow.length - 1); pc++) {
+      const cell = statusRow[pc];
+      if (typeof cell === 'number' && cell > 0) { poHeader = cell; break; }
+      const m = String(cell || '').match(/(\d+(?:\.\d+)?)/);
+      if (m) {
+        const n = parseFloat(m[1]);
+        if (!isNaN(n) && n > 0) { poHeader = n; break; }
+      }
+    }
+
     const departments = [];
     let currentDept = null;
 
@@ -217,6 +232,7 @@ function getReportData(sheetName) {
       sheetName: sheetName,
       departments: clean,
       statuses: statuses,
+      poHeader: poHeader,
       generatedAt: new Date().toLocaleString('id-ID')
     };
 

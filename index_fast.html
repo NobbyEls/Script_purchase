@@ -583,6 +583,55 @@
   .pushjual-empty{text-align:center;padding:30px 20px;color:var(--text3);font-size:12px;}
   .pushjual-count{font-size:11px;color:var(--text3);font-family:var(--mono);margin-left:auto;}
 
+  /* ── BELI (rekomendasi pembelian) ── */
+  .beli-filter{position:sticky;top:var(--topbar-h);z-index:89;display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px;padding:10px 16px;background:var(--filter-bg);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:var(--radius);}
+  .beli-filter label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.3px;}
+  .beli-filter-toggle{display:inline-flex;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:2px;}
+  .beli-filter-toggle button{background:transparent;border:none;color:var(--text2);font-family:var(--font);font-size:11px;font-weight:600;padding:5px 14px;cursor:pointer;border-radius:4px;transition:var(--transition);letter-spacing:0.3px;}
+  .beli-filter-toggle button.active{background:linear-gradient(135deg,var(--accent),#2563eb);color:#fff;box-shadow:0 2px 8px rgba(59,130,246,0.3);}
+  .beli-filter-toggle button:hover:not(.active){background:rgba(255,255,255,0.06);color:var(--text1);}
+  .beli-info{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text2);background:var(--card);border:1px solid var(--border);padding:5px 12px;border-radius:5px;}
+  .beli-info b{color:var(--accent2);font-weight:700;font-family:var(--mono);}
+  .beli-count{margin-left:auto;font-size:11.5px;color:var(--text3);font-family:var(--mono);}
+  .beli-count b{color:var(--accent2);font-weight:700;}
+
+  .beli-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto;max-height:calc(100vh - 200px);overflow-y:auto;}
+  .beli-table{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed;font-family:'Calibri','Segoe UI',sans-serif;min-width:1180px;}
+  .beli-table th, .beli-table td, .beli-table span, .beli-table button, .beli-table div{font-family:'Calibri','Segoe UI',sans-serif !important;}
+  .beli-table thead{position:sticky;top:0;z-index:9;}
+  .beli-table th{padding:9px 10px;text-align:left;font-size:10.5px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap;border-bottom:2px solid var(--border2);background:var(--bg2);}
+  .beli-table th:first-child{padding-left:14px;}
+  .beli-table td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text2);font-size:12.5px;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .beli-table td:first-child{padding-left:14px;}
+  .beli-table tbody tr:hover{background:rgba(59,130,246,0.04);}
+  .beli-table tbody tr:last-child td{border-bottom:none;}
+
+  /* Source badge NB / PC */
+  .beli-src{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:0.5px;padding:2px 8px;border-radius:4px;}
+  .beli-src.nb{background:rgba(59,130,246,0.14);color:var(--accent2);border:1px solid rgba(96,165,250,0.3);}
+  .beli-src.pc{background:rgba(168,85,247,0.14);color:var(--purple);border:1px solid rgba(168,85,247,0.3);}
+  body.light-mode .beli-src.nb{background:rgba(59,130,246,0.18);color:#1e40af;border-color:rgba(30,64,175,0.3);}
+  body.light-mode .beli-src.pc{background:rgba(168,85,247,0.18);color:#6b21a8;border-color:rgba(107,33,168,0.3);}
+
+  .beli-dept{font-size:10.5px;font-weight:600;color:var(--accent2);letter-spacing:0.3px;text-transform:uppercase;}
+  body.light-mode .beli-dept{color:#1e40af;}
+  .beli-name{color:var(--text1);font-weight:500;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .beli-code{font-family:var(--mono);font-size:10.5px;color:var(--text3);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px;}
+  .beli-num{font-family:var(--mono);font-weight:600;color:var(--text1);text-align:center;}
+  .beli-num.zero{color:var(--text3);}
+  .beli-kira{font-family:var(--mono);font-weight:700;color:var(--amber);text-align:center;font-size:13px;}
+  body.light-mode .beli-kira{color:#b45309;}
+  .beli-po{font-family:var(--mono);font-size:11.5px;color:var(--text3);text-align:center;}
+  .beli-hbeli{font-family:var(--mono);color:#fbbf24;font-weight:500;text-align:right;white-space:nowrap;}
+  body.light-mode .beli-hbeli{color:#b45309;}
+  .beli-hbeli-date{font-family:var(--mono);font-size:9px;color:var(--text3);display:block;margin-top:1px;}
+
+  .beli-table .item-name-btn{display:flex;flex-direction:column;align-items:flex-start;background:none;border:none;cursor:pointer;text-align:left;width:100%;padding:0;color:var(--text1);font-family:var(--font);font-size:12.5px;font-weight:500;line-height:1.3;min-width:0;overflow:hidden;}
+  .beli-table .item-name-btn:hover .beli-name{color:var(--accent2);}
+  body.light-mode .beli-table .item-name-btn:hover .beli-name{color:#1e40af;}
+
+  .beli-empty{text-align:center;padding:40px 20px;color:var(--text3);font-size:13px;}
+
   @media(max-width:768px){.main{padding:16px;}.topbar{padding:0 16px;}.search-input{width:160px;}}
 </style>
 </head>
@@ -1089,7 +1138,9 @@ function toggleTheme(){
 // ========================================
 function exportCurrentTab() {
   try {
-    if (_pushJualActive) {
+    if (_beliActive) {
+      exportBeli();
+    } else if (_pushJualActive) {
       exportPushJual();
     } else if (currentSheet) {
       exportPurchaseSheet(currentSheet);
@@ -1205,6 +1256,31 @@ function exportPushJual() {
   downloadXLS(headers, rows, 'Push Jual', fname);
 }
 
+/* Export BELI: rekomendasi pembelian (gabungan NB + PC sesuai filter aktif) */
+function exportBeli() {
+  var items = [];
+  if (_beliFilter === 'all' || _beliFilter === 'NB') {
+    items = items.concat(filterBeliFromPreloaded('Purchase NB', 'NB'));
+  }
+  if (_beliFilter === 'all' || _beliFilter === 'PC') {
+    items = items.concat(filterBeliFromPreloaded('Purchase PC', 'PC'));
+  }
+
+  if (items.length === 0) {
+    alert('Tidak ada data BELI untuk di-export.');
+    return;
+  }
+
+  var headers = ['Sumber','Departemen','Kode','Nama Barang','ALL STOK','OUT QTY','KIRA² Habis','PO Header','Harga Beli','Tgl Beli'];
+  var rows = items.map(function(it){
+    return [it.source, it.dept, it.code, it.name, it.stokAll, it.outQty, it.kira2, it.poHeader, it.hargaBeli, it.hargaDate];
+  });
+
+  var filterLabel = (_beliFilter === 'all') ? '' : ('_' + _beliFilter);
+  var fname = 'BELI' + filterLabel + '_' + getDateStamp() + '.xls';
+  downloadXLS(headers, rows, 'BELI', fname);
+}
+
 /* Helper: timestamp untuk nama file */
 function getDateStamp() {
   var d = new Date();
@@ -1266,8 +1342,9 @@ function renderSheetTabs(sheets) {
   var html = sheets.map(function(s, i) {
     return '<button class="tab-btn'+(i===0?' active':'')+'" onclick="switchSheet(\''+escAttr(s)+'\',this)">'+escHtml(s)+'</button>';
   }).join('');
-  /* Tambahkan tab Push Jual (hardcoded) */
+  /* Tambahkan tab Push Jual & BELI (hardcoded) */
   html += '<button class="tab-btn" onclick="switchToPushJual(this)">Push Jual</button>';
+  html += '<button class="tab-btn" onclick="switchToBeli(this)">BELI</button>';
   c.innerHTML = html;
 }
 
@@ -1276,6 +1353,7 @@ function switchSheet(name, btn) {
   btn.classList.add('active');
   document.getElementById('search-input').value = '';
   _pushJualActive = false;
+  _beliActive = false;
   loadSheet(name);
 }
 
@@ -1284,6 +1362,7 @@ function switchToPushJual(btn) {
   btn.classList.add('active');
   document.getElementById('search-input').value = '';
   _pushJualActive = true;
+  _beliActive = false;
   destroyObserver();
   hideFilterBar();
 
@@ -2198,6 +2277,12 @@ var _pushJualActive = false;
 var _pushJualData   = null;
 var _pushJualSelectedMonth = null;  /* simpan pilihan filter bulan */
 
+// ========================================
+// BELI — rekomendasi SKU yang KIRA² Habis < PO Header
+// ========================================
+var _beliActive = false;
+var _beliFilter = 'all';  /* 'all' | 'NB' | 'PC' */
+
 /* Generate array 12 bulan terakhir (tanggal akhir bulan) */
 function generatePushJualMonths() {
   var now = new Date();
@@ -2400,6 +2485,229 @@ function buildPushJualTable(items) {
       + '<th>Beli</th>'
       + '<th>Usia</th>'
       + '<th>Keterangan</th>'
+    + '</tr></thead>'
+    + '<tbody>' + rows + '</tbody>'
+    + '</table>';
+}
+
+// ========================================
+// BELI — Rekomendasi pembelian SKU
+// Logika: tampilkan SKU jika KIRA² Habis < PO Header
+// PO Header dibaca dari row 1 sheet (kolom Y-AE), per sheet (NB/PC)
+// ========================================
+function switchToBeli(btn) {
+  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  document.getElementById('search-input').value = '';
+  _pushJualActive = false;
+  _beliActive = true;
+  destroyObserver();
+  hideFilterBar();
+
+  /* Pastikan kedua sheet sudah preloaded */
+  var sheetsNeeded = ['Purchase NB', 'Purchase PC'];
+  var missing = sheetsNeeded.filter(function(s){ return !_preloaded[s]; });
+
+  if (missing.length > 0) {
+    var area = document.getElementById('content-area');
+    area.innerHTML = '<div class="loading-overlay"><div class="spinner"></div><div class="loading-text">Memuat data BELI...</div></div>';
+    var promises = missing.map(function(s){ return fetchAll(s).then(function(p){ _preloaded[s] = p; }); });
+    Promise.all(promises).then(function(){
+      sheetsNeeded.forEach(function(s){
+        var p = _preloaded[s];
+        if (p && p.lastBuy && p.lastBuy.success && p.lastBuy.map) {
+          Object.assign(lastBuyMap, p.lastBuy.map);
+        }
+      });
+      renderBeliView();
+    }).catch(function(err){
+      document.getElementById('content-area').innerHTML =
+        '<div class="empty-state"><div class="empty-icon">⚠️</div>Gagal memuat: '+escHtml(String(err))+'</div>';
+    });
+  } else {
+    renderBeliView();
+  }
+}
+
+function renderBeliView() {
+  var area = document.getElementById('content-area');
+
+  /* Ambil PO header per sheet untuk tampil di info */
+  var poNB = getPOHeaderFromPreloaded('Purchase NB');
+  var poPC = getPOHeaderFromPreloaded('Purchase PC');
+
+  area.innerHTML =
+    '<div class="beli-filter">'
+      + '<label>FILTER:</label>'
+      + '<div class="beli-filter-toggle" id="beli-filter-toggle">'
+        + '<button class="'+(_beliFilter==='all'?'active':'')+'" onclick="setBeliFilter(\'all\')">Semua</button>'
+        + '<button class="'+(_beliFilter==='NB'?'active':'')+'" onclick="setBeliFilter(\'NB\')">NB</button>'
+        + '<button class="'+(_beliFilter==='PC'?'active':'')+'" onclick="setBeliFilter(\'PC\')">PC</button>'
+      + '</div>'
+      + '<div class="beli-info">PO NB: <b>'+poNB+' hari</b></div>'
+      + '<div class="beli-info">PO PC: <b>'+poPC+' hari</b></div>'
+      + '<div class="beli-count" id="beli-count"></div>'
+    + '</div>'
+    + '<div id="beli-content"></div>';
+
+  renderBeliContent();
+}
+
+function setBeliFilter(filter) {
+  _beliFilter = filter;
+  /* Update tombol aktif */
+  var toggle = document.getElementById('beli-filter-toggle');
+  if (toggle) {
+    toggle.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
+    var idx = (filter === 'all') ? 0 : (filter === 'NB' ? 1 : 2);
+    toggle.children[idx].classList.add('active');
+  }
+  renderBeliContent();
+}
+
+function getPOHeaderFromPreloaded(sheetName) {
+  var p = _preloaded[sheetName];
+  if (p && p.report && typeof p.report.poHeader === 'number' && p.report.poHeader > 0) {
+    return p.report.poHeader;
+  }
+  return 21; /* fallback default */
+}
+
+function renderBeliContent() {
+  var contentEl = document.getElementById('beli-content');
+  var countEl = document.getElementById('beli-count');
+  if (!contentEl) return;
+
+  var items = [];
+  if (_beliFilter === 'all' || _beliFilter === 'NB') {
+    items = items.concat(filterBeliFromPreloaded('Purchase NB', 'NB'));
+  }
+  if (_beliFilter === 'all' || _beliFilter === 'PC') {
+    items = items.concat(filterBeliFromPreloaded('Purchase PC', 'PC'));
+  }
+
+  if (countEl) {
+    countEl.innerHTML = '<b>'+items.length+'</b> SKU perlu dibeli';
+  }
+
+  if (items.length === 0) {
+    contentEl.innerHTML = '<div class="beli-empty">Tidak ada SKU yang perlu dibeli (semua KIRA² Habis ≥ PO Header).</div>';
+    return;
+  }
+
+  contentEl.innerHTML = '<div class="beli-wrap">' + buildBeliTable(items) + '</div>';
+}
+
+/* Filter dari _preloaded — preserve urutan asli sheet */
+function filterBeliFromPreloaded(sheetName, sourceLabel) {
+  var payload = _preloaded[sheetName];
+  if (!payload || !payload.report || !payload.report.departments) return [];
+
+  var poHeader = getPOHeaderFromPreloaded(sheetName);
+  var items = [];
+
+  payload.report.departments.forEach(function(dept) {
+    if (!dept.items) return;
+    dept.items.forEach(function(item) {
+      if (!item.code) return;
+
+      /* Parse nilai IKIRA² → bisa number atau string "21" / "" */
+      var ikira = item.ikira2;
+      var ikiraNum = NaN;
+      if (typeof ikira === 'number') {
+        ikiraNum = ikira;
+      } else if (typeof ikira === 'string' && ikira.trim() !== '') {
+        var parsed = parseFloat(ikira.replace(/[^0-9.\-]/g,''));
+        if (!isNaN(parsed)) ikiraNum = parsed;
+      }
+      /* Hanya tampilkan jika ada nilai valid DAN < PO Header */
+      if (isNaN(ikiraNum)) return;
+      if (ikiraNum >= poHeader) return;
+
+      /* Detail stok per cabang + DP untuk popup */
+      var stokDetailArr = [];
+      if (item.stokCabang) {
+        ['YGY','SMG','SLO','PWT','BBS','TGL','MDN'].forEach(function(c){
+          stokDetailArr.push(c + ':' + ((item.stokCabang && item.stokCabang[c]) || 0));
+        });
+      }
+      stokDetailArr.push('DP:' + (item.dp || 0));
+
+      /* Harga beli dari lastBuyMap */
+      var lb = lastBuyMap[item.code.toUpperCase()] || null;
+      var hargaBeli = (lb && lb.harga > 0) ? fmtRupiahJS(lb.harga) : '—';
+      var hargaDate = (lb && lb.tanggal) ? lb.tanggal : '';
+
+      items.push({
+        source:      sourceLabel,
+        dept:        dept.name || '',
+        code:        item.code,
+        name:        item.name || item.code,
+        stokAll:     item.allStok || 0,
+        stokPopup:   stokDetailArr.join('|'),
+        outQty:      item.outQty || 0,
+        kira2:       ikiraNum,
+        poHeader:    poHeader,
+        orderPlus:   item.orderPlus || 0,
+        orderMinus:  item.orderMinus || 0,
+        hargaBeli:   hargaBeli,
+        hargaDate:   hargaDate
+      });
+    });
+  });
+
+  return items;
+}
+
+function buildBeliTable(items) {
+  var rows = items.map(function(it) {
+    var srcClass = (it.source === 'NB') ? 'nb' : 'pc';
+    var stokCls = it.stokAll > 0 ? 'beli-num' : 'beli-num zero';
+
+    var hargaCell = '<span class="beli-hbeli">'+escHtml(it.hargaBeli)+'</span>';
+    if (it.hargaDate) hargaCell += '<span class="beli-hbeli-date">'+escHtml(it.hargaDate)+'</span>';
+
+    return '<tr>'
+      + '<td><span class="beli-src '+srcClass+'">'+escHtml(it.source)+'</span></td>'
+      + '<td><span class="beli-dept">'+escHtml(it.dept)+'</span></td>'
+      + '<td>'
+        + '<button class="item-name-btn" '
+          + 'onmouseenter="showTooltip(this)" onmouseleave="hideTooltip()" '
+          + 'onmousemove="positionTooltip(event.clientX, event.clientY)" '
+          + 'data-name="'+escAttr(it.name)+'" data-code="'+escAttr(it.code)+'" '
+          + 'onclick="openHistoryFromBtn(this)">'
+          + '<span class="beli-name">'+escHtml(it.name)+'</span>'
+          + '<span class="beli-code">'+escHtml(it.code)+'</span>'
+        + '</button>'
+      + '</td>'
+      + '<td class="td-allstok" data-stok="'+escHtml(it.stokPopup)+'"><span class="'+stokCls+'">'+it.stokAll+'</span></td>'
+      + '<td><span class="beli-num">'+(it.outQty||0)+'</span></td>'
+      + '<td><span class="beli-kira">'+it.kira2+'</span></td>'
+      + '<td><span class="beli-po">'+it.poHeader+'</span></td>'
+      + '<td>'+hargaCell+'</td>'
+      + '</tr>';
+  }).join('');
+
+  return '<table class="beli-table">'
+    + '<colgroup>'
+      + '<col style="width:54px">'   /* Source */
+      + '<col style="width:120px">'  /* Dept */
+      + '<col style="width:auto">'   /* Nama */
+      + '<col style="width:80px">'   /* Stok */
+      + '<col style="width:80px">'   /* Out Qty */
+      + '<col style="width:90px">'   /* Kira² */
+      + '<col style="width:80px">'   /* PO */
+      + '<col style="width:140px">'  /* Harga Beli */
+    + '</colgroup>'
+    + '<thead><tr>'
+      + '<th style="text-align:center">Sumber</th>'
+      + '<th>Departemen</th>'
+      + '<th>Nama Barang</th>'
+      + '<th style="text-align:center">ALL STOK</th>'
+      + '<th style="text-align:center">OUT QTY</th>'
+      + '<th style="text-align:center">KIRA²</th>'
+      + '<th style="text-align:center">PO</th>'
+      + '<th style="text-align:right">Harga Beli</th>'
     + '</tr></thead>'
     + '<tbody>' + rows + '</tbody>'
     + '</table>';
