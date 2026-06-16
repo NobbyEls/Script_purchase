@@ -892,34 +892,51 @@ function fetchAll(sheetName, onStep, forceFresh){
 }
 
 /* Render badge status dari array string.
-   Logika ringkas:
-   - Semua status mengandung "OK"      -> "Data OK" hijau
-   - Ada yang mengandung "Cek" (atau bukan all-OK) -> "Data Belum OK" merah
-   - Tooltip menampilkan semua status mentah supaya user bisa cek detail */
+   Logika:
+   - Cell yang mengandung "OK" atau "Cek" -> data status:
+       * Semua OK   -> 1 badge "Data OK" hijau
+       * Ada yg Cek -> 1 badge "Data Belum OK" merah
+   - Cell lain (mis. "PO :", "21", "Hari") -> tetap tampil sebagai
+     1 badge informasi (digabung dengan spasi).
+   - Tooltip pada badge data menampilkan semua status mentah. */
 function renderStatusBadges(statuses){
   var bar = document.getElementById('status-bar');
   if (!statuses || statuses.length === 0){
     bar.innerHTML = '<span class="status-badge err">Status N/A</span>';
     return;
   }
-  var allOk  = statuses.every(function(s){ return /\bok\b/i.test(String(s||'')); });
-  var anyCek = statuses.some(function(s){  return /cek/i.test(String(s||'')); });
 
-  var label, cls;
-  if (allOk) {
-    label = 'Data OK';
-    cls = 'ok';
-  } else if (anyCek) {
-    label = 'Data Belum OK';
-    cls = 'err';
-  } else {
-    /* Fallback: tidak match kategori manapun -> tampilkan apa adanya sebagai warning */
-    label = 'Data Belum OK';
-    cls = 'err';
+  /* Pisahkan: data status (OK/Cek) vs lainnya (mis. PO header) */
+  var dataStatuses = [];
+  var others = [];
+  statuses.forEach(function(s){
+    var str = String(s||'').trim();
+    if (!str) return;
+    if (/\bok\b/i.test(str) || /cek/i.test(str)) {
+      dataStatuses.push(str);
+    } else {
+      others.push(str);
+    }
+  });
+
+  var html = '';
+
+  /* Badge agregasi data status */
+  if (dataStatuses.length > 0) {
+    var allOk = dataStatuses.every(function(s){ return /\bok\b/i.test(s); });
+    var label = allOk ? 'Data OK' : 'Data Belum OK';
+    var cls   = allOk ? 'ok'      : 'err';
+    var tip   = dataStatuses.join(' | ');
+    html += '<span class="status-badge ' + cls + '" title="' + escAttr(tip) + '">' + escHtml(label) + '</span>';
   }
 
-  var tooltip = statuses.join(' | ');
-  bar.innerHTML = '<span class="status-badge ' + cls + '" title="' + escAttr(tooltip) + '">' + escHtml(label) + '</span>';
+  /* Badge info lain (PO header dll) - digabung jadi 1, normalisasi spasi */
+  if (others.length > 0) {
+    var combined = others.join(' ').replace(/\s+/g, ' ').trim();
+    html += '<span class="status-badge loading">' + escHtml(combined) + '</span>';
+  }
+
+  bar.innerHTML = html;
 }
 
 /* Render semua dari payload */
