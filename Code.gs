@@ -76,30 +76,54 @@ const MASTER_PC_CONFIG = {
 };
 
 // ============================================================
-// SUMBER DATA EKSTERNAL — bypass IMPORTRANGE untuk Harga & Note
-// Spreadsheet sumber dibaca langsung via SpreadsheetApp.openById(),
-// jauh lebih cepat dibanding membaca sheet aktif yang pakai
-// IMPORTRANGE (yang re-evaluate setiap akses).
-// Akun pemilik Apps Script harus punya akses (view minimum) ke ID ini.
+// SUMBER DATA EKSTERNAL — bypass IMPORTRANGE untuk semua field
+// kecuali Processor (vlookup typeProc->processor di Master SKU NB).
+// Spreadsheet sumber dibaca langsung via SpreadsheetApp.openById().
+// Akun pemilik Apps Script harus punya akses ke ID ini.
 // ============================================================
 const EXTERNAL_SOURCES = {
   spreadsheetId: '12SUP1b7YfIEntEyj1T5YJwBS89uHtNk9lJTkFywkV_Q',
   NB: {
-    hargaSheet:     'Laptop_Products',
-    hargaColCode:   1,    // B: SKU
-    hargaColPrice: 10,    // K: Harga ELS
-    noteSheet:      'Struktur_Harga_NB',
-    noteColCode:    1,    // B: SKU
-    noteColNote:   18     // S: Note
+    productSheet: 'Laptop_Products',
+    productCols: {
+      code:       1,    // B: SKU
+      typeLaptop: 3,    // D
+      typeProc:   5,    // F
+      ram:        6,    // G
+      storage:    7,    // H
+      size:       8,    // I
+      harga:     10     // K
+    },
+    noteSheet: 'Struktur_Harga_NB',
+    noteCols: {
+      code: 1,          // B
+      note: 18          // S
+    }
   },
   PC: {
-    hargaSheet:     'PC_Products',
-    hargaColCode:   0,    // A: SKU
-    hargaColPrice:  8,    // I: Harga ELS
-    noteSheet:      'Struktur_Harga_PC',
-    noteColCode:    1,    // B: SKU
-    noteColNote:    9     // J: Note
+    productSheet: 'PC_Products',
+    productCols: {
+      code:  0,         // A
+      harga: 8          // I
+    },
+    noteSheet: 'Struktur_Harga_PC',
+    noteCols: {
+      code: 1,          // B
+      note: 9           // J
+    }
   }
+};
+
+// ============================================================
+// LOOKUP PROCESSOR — vlookup di Master SKU NB (active spreadsheet).
+// Type Proc di kolom P (index 15) -> Processor di kolom Q (index 16).
+// Hanya 2 kolom yang dibaca, jadi fast walaupun sheet active punya
+// IMPORTRANGE di kolom lain.
+// ============================================================
+const PROCESSOR_LOOKUP = {
+  sheetName:    'Master SKU NB',
+  colTypeProc:  15,   // P (0-based)
+  colProcessor: 16    // Q
 };
 
 // ============================================================
@@ -125,7 +149,7 @@ function doGet(e) {
 //  - Tombol "Update Data" pass forceFresh=true → bypass cache
 //  - Cache disimpan jika respons sukses (skip kalau ada error)
 // ============================================================
-const CACHE_VER = 'v6';   // bump ini saat shape data berubah
+const CACHE_VER = 'v7';   // bump ini saat shape data berubah
 
 function _cacheGet(key) {
   try {
@@ -474,57 +498,74 @@ function _readExternalKeyValueMap(spreadsheet, sheetName, colKey, colValue, kind
 }
 
 // ============================================================
-// HELPER: Baca filter fields NB (typeLaptop/ram/size/dll) dari
-// active spreadsheet's "Master SKU NB". Hanya untuk kebutuhan
-// dropdown filter di tab NB. Harga dari sini di-IGNORE
-// (pakai harga dari external).
+// HELPER: Baca SEMUA field NB dari sheet Laptop_Products eksternal
+// (sekali baca untuk semua kolom yang dibutuhkan).
+// Return: { map, sets } dimana sets={typeLaptop, ram, storage, size, typeProc}
 // ============================================================
-function _readNBFiltersFromActive() {
+function _readNBProductsFromExternal(spreadsheet) {
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sh = ss.getSheetByName('Master SKU NB');
-    if (!sh) return null;
+    const cfg = EXTERNAL_SOURCES.NB.productCols;
+    const sh = spreadsheet.getSheetByName(EXTERNAL_SOURCES.NB.productSheet);
+    if (!sh) {
+      Logger.log('External sheet Laptop_Products tidak ditemukan');
+      return { map: {}, typeLaptops: [], typeProcs: [], rams: [], storages: [], sizes: [], priceMin: 0, priceMax: 0 };
+    }
     const lastRow = sh.getLastRow();
-    if (lastRow < 2) return null;
-    const data = sh.getRange(1, 1, lastRow, MASTER_CONFIG.TOTAL_COLS).getValues();
+    if (lastRow < 2) {
+      return { map: {}, typeLaptops: [], typeProcs: [], rams: [], storages: [], sizes: [], priceMin: 0, priceMax: 0 };
+    }
+    // Baca sampai kolom paling kanan yang dibutuhkan (max dari semua col index + 1)
+    const maxCol = Math.max(cfg.code, cfg.typeLaptop, cfg.typeProc, cfg.ram, cfg.storage, cfg.size, cfg.harga) + 1;
+    const data = sh.getRange(1, 1, lastRow, maxCol).getValues();
 
     const map = {};
-    const laptopSet = {};
-    const procSet   = {};
-    const processorSet = {};
-    const ramSet    = {};
-    const storageSet = {};
-    const sizeSet   = {};
+    const laptopSet = {}, procSet = {}, ramSet = {}, storageSet = {}, sizeSet = {};
+    let priceMin = Infinity, priceMax = -Infinity;
 
-    for (let r = MASTER_CONFIG.DATA_START_ROW; r < data.length; r++) {
-      const row  = data[r];
-      const code = String(row[MASTER_CONFIG.COL_CODE] || '').trim();
-      if (!code || (code.indexOf('-') === -1 && code.indexOf('/') === -1)) continue;
+    for (let r = 1; r < data.length; r++) {
+      const row = data[r];
+      const code = String(row[cfg.code] || '').trim();
+      if (!code) continue;
+      const upCode = code.toUpperCase();
 
-      const typeLaptop = String(row[MASTER_CONFIG.COL_TYPE_LAPTOP] || '').trim();
-      const typeProc   = String(row[MASTER_CONFIG.COL_TYPE_PROC]   || '').trim();
-      const processor  = String(row[MASTER_CONFIG.COL_PROCESSOR]   || '').trim();
-      const ram        = String(row[MASTER_CONFIG.COL_RAM]         || '').substring(0, 5).trim();
-      const storage    = String(row[MASTER_CONFIG.COL_STORAGE]     || '').trim();
-      const size       = String(row[MASTER_CONFIG.COL_SIZE]        || '').substring(0, 3).trim();
+      const typeLaptop = String(row[cfg.typeLaptop] || '').trim();
+      const typeProc   = String(row[cfg.typeProc]   || '').trim();
+      // RAM: ambil 5 karakter awal sesuai requirement sebelumnya
+      const ram        = String(row[cfg.ram]        || '').substring(0, 5).trim();
+      const storage    = String(row[cfg.storage]    || '').trim();
+      // Size layar: ambil 3 karakter awal
+      const size       = String(row[cfg.size]       || '').substring(0, 3).trim();
+      const harga      = toNum(row[cfg.harga]);
 
-      map[code.toUpperCase()] = {
-        typeLaptop: typeLaptop, typeProc: typeProc, processor: processor,
-        ram: ram, storage: storage, size: size
+      map[upCode] = {
+        typeLaptop: typeLaptop,
+        typeProc:   typeProc,
+        processor:  '',          // diisi nanti via vlookup
+        ram:        ram,
+        storage:    storage,
+        size:       size,
+        harga:      harga,
+        note:       ''           // diisi nanti dari Struktur_Harga_NB
       };
+
       if (typeLaptop) laptopSet[typeLaptop] = true;
-      if (typeProc)   procSet[typeProc] = true;
-      if (processor)  processorSet[processor] = true;
-      if (ram)        ramSet[ram] = true;
-      if (storage)    storageSet[storage] = true;
-      if (size)       sizeSet[size] = true;
+      if (typeProc)   procSet[typeProc]     = true;
+      if (ram)        ramSet[ram]           = true;
+      if (storage)    storageSet[storage]   = true;
+      if (size)       sizeSet[size]         = true;
+      if (harga > 0) {
+        if (harga < priceMin) priceMin = harga;
+        if (harga > priceMax) priceMax = harga;
+      }
     }
+
+    if (priceMin === Infinity)  priceMin = 0;
+    if (priceMax === -Infinity) priceMax = 0;
 
     return {
       map: map,
       typeLaptops: Object.keys(laptopSet).sort(),
       typeProcs:   Object.keys(procSet).sort(),
-      processors:  Object.keys(processorSet).sort(),
       rams:        Object.keys(ramSet).sort(),
       storages:    Object.keys(storageSet).sort(),
       sizes:       Object.keys(sizeSet).sort(function(a, b){
@@ -532,75 +573,140 @@ function _readNBFiltersFromActive() {
                      var nb = parseFloat(b) || 0;
                      if (na !== nb) return na - nb;
                      return a.localeCompare(b);
-                   })
+                   }),
+      priceMin: priceMin,
+      priceMax: priceMax
     };
   } catch(e) {
-    Logger.log('_readNBFiltersFromActive error: ' + e.toString());
-    return null;
+    Logger.log('_readNBProductsFromExternal error: ' + e.toString());
+    return { map: {}, typeLaptops: [], typeProcs: [], rams: [], storages: [], sizes: [], priceMin: 0, priceMax: 0 };
+  }
+}
+
+// ============================================================
+// HELPER: Vlookup typeProc -> processor dari Master SKU NB (active).
+// Hanya baca kolom P-Q. Return: { TYPE_PROC_UPPER -> processor }
+// ============================================================
+function _readProcessorLookupFromActive() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sh = ss.getSheetByName(PROCESSOR_LOOKUP.sheetName);
+    if (!sh) return {};
+    const lastRow = sh.getLastRow();
+    if (lastRow < 2) return {};
+
+    // Baca hanya kolom P-Q (2 kolom) — getRange(startRow, startCol, numRows, numCols)
+    const startCol = PROCESSOR_LOOKUP.colTypeProc + 1;     // 1-based -> 16 (kolom P)
+    const numCols  = PROCESSOR_LOOKUP.colProcessor - PROCESSOR_LOOKUP.colTypeProc + 1;
+    const data = sh.getRange(1, startCol, lastRow, numCols).getValues();
+
+    const map = {};
+    for (let r = 1; r < data.length; r++) {
+      const tp   = String(data[r][0] || '').trim();
+      const proc = String(data[r][1] || '').trim();
+      if (tp && proc && !map[tp.toUpperCase()]) {
+        map[tp.toUpperCase()] = proc;
+      }
+    }
+    return map;
+  } catch(e) {
+    Logger.log('_readProcessorLookupFromActive error: ' + e.toString());
+    return {};
   }
 }
 
 function _getMasterDataRaw(masterSheetName) {
   try {
     const isPC = /master\s*sku\s*pc/i.test(String(masterSheetName));
-    const cfg  = isPC ? EXTERNAL_SOURCES.PC : EXTERNAL_SOURCES.NB;
-
-    // 1) Baca data dari spreadsheet sumber langsung (bypass IMPORTRANGE)
     const ext = SpreadsheetApp.openById(EXTERNAL_SOURCES.spreadsheetId);
-    const hargaMap = _readExternalKeyValueMap(ext, cfg.hargaSheet, cfg.hargaColCode, cfg.hargaColPrice, 'number');
-    const noteMap  = _readExternalKeyValueMap(ext, cfg.noteSheet,  cfg.noteColCode,  cfg.noteColNote,  'text');
 
-    // 2) Untuk NB: gabung dengan filter fields dari active Master SKU NB
-    //    (typeLaptop/ram/size/typeProc/processor untuk dropdown filter)
-    const filters = isPC ? null : _readNBFiltersFromActive();
+    if (isPC) {
+      // ───── PC: hanya harga + note dari sumber eksternal ─────
+      const cfg = EXTERNAL_SOURCES.PC;
+      const hargaMap = _readExternalKeyValueMap(ext, cfg.productSheet, cfg.productCols.code, cfg.productCols.harga, 'number');
+      const noteMap  = _readExternalKeyValueMap(ext, cfg.noteSheet,    cfg.noteCols.code,    cfg.noteCols.note,    'text');
 
-    // 3) Combine semua map jadi 1 map per SKU
-    const allCodes = {};
-    Object.keys(hargaMap).forEach(function(c){ allCodes[c] = true; });
-    Object.keys(noteMap).forEach(function(c){ allCodes[c] = true; });
-    if (filters && filters.map) {
-      Object.keys(filters.map).forEach(function(c){ allCodes[c] = true; });
+      const map = {};
+      let priceMin = Infinity, priceMax = -Infinity;
+      const allCodes = {};
+      Object.keys(hargaMap).forEach(function(c){ allCodes[c] = true; });
+      Object.keys(noteMap).forEach(function(c){ allCodes[c] = true; });
+
+      Object.keys(allCodes).forEach(function(code){
+        const harga = hargaMap[code] || 0;
+        map[code] = {
+          typeLaptop: '', typeProc: '', processor: '',
+          ram: '', storage: '', size: '',
+          harga: harga,
+          note:  noteMap[code] || ''
+        };
+        if (harga > 0) {
+          if (harga < priceMin) priceMin = harga;
+          if (harga > priceMax) priceMax = harga;
+        }
+      });
+      if (priceMin === Infinity)  priceMin = 0;
+      if (priceMax === -Infinity) priceMax = 0;
+
+      return {
+        success: true,
+        map: map,
+        typeLaptops: [], typeProcs: [], processors: [],
+        rams: [], storages: [], sizes: [],
+        priceMin: priceMin, priceMax: priceMax
+      };
     }
 
-    const map = {};
-    let priceMin = Infinity, priceMax = -Infinity;
+    // ───── NB: full read dari Laptop_Products + Note + Processor lookup ─────
+    const products  = _readNBProductsFromExternal(ext);
+    const noteMap   = _readExternalKeyValueMap(
+      ext,
+      EXTERNAL_SOURCES.NB.noteSheet,
+      EXTERNAL_SOURCES.NB.noteCols.code,
+      EXTERNAL_SOURCES.NB.noteCols.note,
+      'text'
+    );
+    const procLookup = _readProcessorLookupFromActive();
 
-    Object.keys(allCodes).forEach(function(code){
-      const fEntry = (filters && filters.map[code]) ? filters.map[code] : {};
-      const harga  = hargaMap[code] || 0;
-      const note   = noteMap[code]  || '';
-
-      map[code] = {
-        typeLaptop: fEntry.typeLaptop || '',
-        typeProc:   fEntry.typeProc   || '',
-        processor:  fEntry.processor  || '',
-        ram:        fEntry.ram        || '',
-        storage:    fEntry.storage    || '',
-        size:       fEntry.size       || '',
-        harga:      harga,
-        note:       note
-      };
-
-      if (harga > 0) {
-        if (harga < priceMin) priceMin = harga;
-        if (harga > priceMax) priceMax = harga;
+    // Merge: tambahkan note + processor ke map products
+    const processorSet = {};
+    Object.keys(products.map).forEach(function(code){
+      const entry = products.map[code];
+      // Note
+      if (noteMap[code]) entry.note = noteMap[code];
+      // Processor (vlookup typeProc -> processor)
+      if (entry.typeProc) {
+        const proc = procLookup[entry.typeProc.toUpperCase()] || '';
+        if (proc) {
+          entry.processor = proc;
+          processorSet[proc] = true;
+        }
       }
     });
 
-    if (priceMin === Infinity)  priceMin = 0;
-    if (priceMax === -Infinity) priceMax = 0;
+    // Tambahkan SKU yang ada di noteMap tapi tidak di products (rare edge case)
+    Object.keys(noteMap).forEach(function(code){
+      if (!products.map[code]) {
+        products.map[code] = {
+          typeLaptop: '', typeProc: '', processor: '',
+          ram: '', storage: '', size: '',
+          harga: 0,
+          note: noteMap[code]
+        };
+      }
+    });
 
     return {
-      success:     true,
-      map:         map,
-      typeLaptops: filters ? filters.typeLaptops : [],
-      typeProcs:   filters ? filters.typeProcs   : [],
-      processors:  filters ? filters.processors  : [],
-      rams:        filters ? filters.rams        : [],
-      storages:    filters ? filters.storages    : [],
-      sizes:       filters ? filters.sizes       : [],
-      priceMin:    priceMin,
-      priceMax:    priceMax
+      success: true,
+      map: products.map,
+      typeLaptops: products.typeLaptops,
+      typeProcs:   products.typeProcs,
+      processors:  Object.keys(processorSet).sort(),
+      rams:        products.rams,
+      storages:    products.storages,
+      sizes:       products.sizes,
+      priceMin:    products.priceMin,
+      priceMax:    products.priceMax
     };
 
   } catch(e) {
