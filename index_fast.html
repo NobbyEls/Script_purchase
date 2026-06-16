@@ -891,17 +891,35 @@ function fetchAll(sheetName, onStep, forceFresh){
   });
 }
 
-/* Render badge status dari array string */
+/* Render badge status dari array string.
+   Logika ringkas:
+   - Semua status mengandung "OK"      -> "Data OK" hijau
+   - Ada yang mengandung "Cek" (atau bukan all-OK) -> "Data Belum OK" merah
+   - Tooltip menampilkan semua status mentah supaya user bisa cek detail */
 function renderStatusBadges(statuses){
   var bar = document.getElementById('status-bar');
   if (!statuses || statuses.length === 0){
     bar.innerHTML = '<span class="status-badge err">Status N/A</span>';
     return;
   }
-  bar.innerHTML = statuses.map(function(s){
-    var isOk = String(s).toLowerCase().includes('ok');
-    return '<span class="status-badge '+(isOk?'ok':'err')+'">'+escHtml(s)+'</span>';
-  }).join('');
+  var allOk  = statuses.every(function(s){ return /\bok\b/i.test(String(s||'')); });
+  var anyCek = statuses.some(function(s){  return /cek/i.test(String(s||'')); });
+
+  var label, cls;
+  if (allOk) {
+    label = 'Data OK';
+    cls = 'ok';
+  } else if (anyCek) {
+    label = 'Data Belum OK';
+    cls = 'err';
+  } else {
+    /* Fallback: tidak match kategori manapun -> tampilkan apa adanya sebagai warning */
+    label = 'Data Belum OK';
+    cls = 'err';
+  }
+
+  var tooltip = statuses.join(' | ');
+  bar.innerHTML = '<span class="status-badge ' + cls + '" title="' + escAttr(tooltip) + '">' + escHtml(label) + '</span>';
 }
 
 /* Render semua dari payload */
