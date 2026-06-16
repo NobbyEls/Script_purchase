@@ -210,7 +210,7 @@
   .progress-pct{color:var(--accent2);font-weight:700;font-size:16px;}
 
   /* ── DEPT ── */
-  .dept-section{margin-bottom:24px;animation:fadeUp 0.35s ease forwards;opacity:0;transform:translateY(12px);max-width:1560px;margin-left:auto;margin-right:auto;}
+  .dept-section{margin-bottom:24px;animation:fadeUp 0.35s ease forwards;opacity:0;transform:translateY(12px);max-width:1800px;margin-left:auto;margin-right:auto;}
   @keyframes fadeUp{to{opacity:1;transform:translateY(0);}}
   .dept-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:10px 16px;background:var(--card2);border:1px solid var(--border2);border-radius:var(--radius);border-left:3px solid var(--accent);}
   .dept-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;}
@@ -231,14 +231,14 @@
 
   /*
    * ── REPORT TABLE ──
-   * Total lebar = 300 + 6×52 + 58 + 7×48 + 58 + 54 + 2×54 + 58 + 58 + 52 + 52
-   *             = 300 + 312 + 58 + 336 + 58 + 54 + 108 + 58 + 58 + 52 + 52
-   *             = 1,446px  → pakai 1460px beri ruang napas
-   * table-layout:fixed → lebar kolom ditentukan oleh <col>, bukan konten
+   * Total lebar dihitung otomatis dari array COL_WIDTHS (di JS).
+   * Saat ini: 1750px untuk 19 kolom (Purchase + Harga Beli + Harga ELS + Note).
+   * <table> pakai inline style="width:TABLE_WIDTH" yang override class width.
+   * table-layout:fixed → lebar kolom ditentukan oleh <col>, bukan konten.
    */
   .report-table{
-    width:1510px;
-    min-width:1510px;
+    width:1750px;
+    min-width:1750px;
     border-collapse:collapse;
     font-size:13px;
     table-layout:fixed;
@@ -969,9 +969,9 @@ var COL_WIDTHS = [
   110,        // 17 HARGA ELS
   240         // 18 NOTE
 ];
-/* Total = 300+6×52+58+7×48+2×58+54+2×54+58+58+52+52
-         = 300+312+58+336+116+54+108+58+58+52+52 = 1,454px
-   Kita pakai 1460px (TABLE_WIDTH) */
+/* Total = 1750px (16 kolom Purchase asli + Harga Beli + Harga ELS + Note)
+   TABLE_WIDTH dihitung otomatis via reduce(sum). Lihat .dept-section
+   max-width:1800px supaya tabel muat tanpa scroll horizontal. */
 var TABLE_WIDTH = COL_WIDTHS.reduce(function(a,b){return a+b;}, 0);
 
 /* Buat string colgroup sekali pakai, reuse di setiap tabel */
