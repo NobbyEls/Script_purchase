@@ -76,6 +76,33 @@ const MASTER_PC_CONFIG = {
 };
 
 // ============================================================
+// SUMBER DATA EKSTERNAL — bypass IMPORTRANGE untuk Harga & Note
+// Spreadsheet sumber dibaca langsung via SpreadsheetApp.openById(),
+// jauh lebih cepat dibanding membaca sheet aktif yang pakai
+// IMPORTRANGE (yang re-evaluate setiap akses).
+// Akun pemilik Apps Script harus punya akses (view minimum) ke ID ini.
+// ============================================================
+const EXTERNAL_SOURCES = {
+  spreadsheetId: '12SUP1b7YfIEntEyj1T5YJwBS89uHtNk9lJTkFywkV_Q',
+  NB: {
+    hargaSheet:     'Laptop_Products',
+    hargaColCode:   1,    // B: SKU
+    hargaColPrice: 10,    // K: Harga ELS
+    noteSheet:      'Struktur_Harga_NB',
+    noteColCode:    1,    // B: SKU
+    noteColNote:   18     // S: Note
+  },
+  PC: {
+    hargaSheet:     'PC_Products',
+    hargaColCode:   0,    // A: SKU
+    hargaColPrice:  8,    // I: Harga ELS
+    noteSheet:      'Struktur_Harga_PC',
+    noteColCode:    1,    // B: SKU
+    noteColNote:    9     // J: Note
+  }
+};
+
+// ============================================================
 // WEB APP ENTRY
 // 2 versi dalam 1 app:
 //   ?mode=cache -> versi dengan in-memory cache (index_cache.html)
@@ -98,7 +125,7 @@ function doGet(e) {
 //  - Tombol "Update Data" pass forceFresh=true → bypass cache
 //  - Cache disimpan jika respons sukses (skip kalau ada error)
 // ============================================================
-const CACHE_VER = 'v5';   // bump ini saat shape data berubah
+const CACHE_VER = 'v6';   // bump ini saat shape data berubah
 
 function _cacheGet(key) {
   try {
@@ -409,89 +436,156 @@ function getMasterData(masterSheetName, forceFresh) {
   });
 }
 
-function _getMasterDataRaw(masterSheetName) {
+// ============================================================
+// HELPER: Baca peta { CODE_UPPER -> value } dari sheet eksternal.
+// kind: 'number' (toNum) atau 'text' (string trim).
+// Return {} kalau sheet tidak ada / error (graceful degradation).
+// ============================================================
+function _readExternalKeyValueMap(spreadsheet, sheetName, colKey, colValue, kind) {
   try {
-    // Auto-detect schema: Master SKU PC pakai struktur sederhana (A=Kode, I=Harga)
-    const isPC = /master\s*sku\s*pc/i.test(String(masterSheetName));
-    const cfg  = isPC ? MASTER_PC_CONFIG : MASTER_CONFIG;
-
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sh = ss.getSheetByName(masterSheetName);
-    if (!sh) return { success: false, error: 'Sheet "' + masterSheetName + '" tidak ditemukan.' };
-
-    const lastRow = sh.getLastRow();
-    if (lastRow < 2) {
-      return { success: true, map: {}, typeLaptops: [], typeProcs: [],
-               processors: [], rams: [], storages: [], sizes: [],
-               priceMin: 0, priceMax: 0 };
+    const sh = spreadsheet.getSheetByName(sheetName);
+    if (!sh) {
+      Logger.log('External sheet "' + sheetName + '" tidak ditemukan');
+      return {};
     }
+    const lastRow = sh.getLastRow();
+    if (lastRow < 2) return {};
+    const lastCol = Math.max(colKey, colValue) + 1;
+    const data = sh.getRange(1, 1, lastRow, lastCol).getValues();
+    const map = {};
+    for (let r = 1; r < data.length; r++) {  // skip baris 1 (header)
+      const key = String(data[r][colKey] || '').trim();
+      if (!key) continue;
+      const upKey = key.toUpperCase();
+      if (kind === 'number') {
+        const n = toNum(data[r][colValue]);
+        // ambil yg pertama atau yg lebih besar (kalau duplicate, pilih > 0)
+        if (!(upKey in map) || (n > 0 && map[upKey] === 0)) map[upKey] = n;
+      } else {
+        const s = String(data[r][colValue] || '').trim();
+        if (s && !map[upKey]) map[upKey] = s;
+      }
+    }
+    return map;
+  } catch(e) {
+    Logger.log('readExternalKV error (' + sheetName + '): ' + e.toString());
+    return {};
+  }
+}
 
-    const data = sh.getRange(1, 1, lastRow, cfg.TOTAL_COLS).getValues();
+// ============================================================
+// HELPER: Baca filter fields NB (typeLaptop/ram/size/dll) dari
+// active spreadsheet's "Master SKU NB". Hanya untuk kebutuhan
+// dropdown filter di tab NB. Harga dari sini di-IGNORE
+// (pakai harga dari external).
+// ============================================================
+function _readNBFiltersFromActive() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sh = ss.getSheetByName('Master SKU NB');
+    if (!sh) return null;
+    const lastRow = sh.getLastRow();
+    if (lastRow < 2) return null;
+    const data = sh.getRange(1, 1, lastRow, MASTER_CONFIG.TOTAL_COLS).getValues();
 
-    const map       = {};
+    const map = {};
     const laptopSet = {};
     const procSet   = {};
     const processorSet = {};
     const ramSet    = {};
     const storageSet = {};
     const sizeSet   = {};
-    let priceMin = Infinity, priceMax = -Infinity;
 
-    for (let r = cfg.DATA_START_ROW; r < data.length; r++) {
+    for (let r = MASTER_CONFIG.DATA_START_ROW; r < data.length; r++) {
       const row  = data[r];
-      const code = String(row[cfg.COL_CODE] || '').trim();
-      // Lewati baris kosong / baris departemen (tanpa '-' & '/')
+      const code = String(row[MASTER_CONFIG.COL_CODE] || '').trim();
       if (!code || (code.indexOf('-') === -1 && code.indexOf('/') === -1)) continue;
 
-      const harga = toNum(row[cfg.COL_HARGA]);
+      const typeLaptop = String(row[MASTER_CONFIG.COL_TYPE_LAPTOP] || '').trim();
+      const typeProc   = String(row[MASTER_CONFIG.COL_TYPE_PROC]   || '').trim();
+      const processor  = String(row[MASTER_CONFIG.COL_PROCESSOR]   || '').trim();
+      const ram        = String(row[MASTER_CONFIG.COL_RAM]         || '').substring(0, 5).trim();
+      const storage    = String(row[MASTER_CONFIG.COL_STORAGE]     || '').trim();
+      const size       = String(row[MASTER_CONFIG.COL_SIZE]        || '').substring(0, 3).trim();
 
-      let entry;
-      if (isPC) {
-        // Master SKU PC: hanya Kode + Harga (filter NB-only tidak relevan utk PC)
-        entry = {
-          typeLaptop: '', typeProc: '', processor: '',
-          ram:        '', storage:  '', size:      '',
-          harga:      harga,
-          note:       ''
-        };
-      } else {
-        // Master SKU NB: full schema
-        const typeLaptop = String(row[MASTER_CONFIG.COL_TYPE_LAPTOP] || '').trim();
-        const typeProc   = String(row[MASTER_CONFIG.COL_TYPE_PROC]   || '').trim();
-        const processor  = String(row[MASTER_CONFIG.COL_PROCESSOR]   || '').trim();
-        // RAM: ambil 5 karakter awal dari sumber data (mis. "16GB DDR4 ..." → "16GB ")
-        const ram        = String(row[MASTER_CONFIG.COL_RAM]         || '').substring(0, 5).trim();
-        const storage    = String(row[MASTER_CONFIG.COL_STORAGE]     || '').trim();
-        // Size layar: ambil 3 karakter awal (mis. "15.6 inch" → "15.")
-        const size       = String(row[MASTER_CONFIG.COL_SIZE]        || '').substring(0, 3).trim();
-        const note       = String(row[MASTER_CONFIG.COL_NOTE]        || '').trim();
+      map[code.toUpperCase()] = {
+        typeLaptop: typeLaptop, typeProc: typeProc, processor: processor,
+        ram: ram, storage: storage, size: size
+      };
+      if (typeLaptop) laptopSet[typeLaptop] = true;
+      if (typeProc)   procSet[typeProc] = true;
+      if (processor)  processorSet[processor] = true;
+      if (ram)        ramSet[ram] = true;
+      if (storage)    storageSet[storage] = true;
+      if (size)       sizeSet[size] = true;
+    }
 
-        entry = {
-          typeLaptop: typeLaptop,
-          typeProc:   typeProc,
-          processor:  processor,
-          ram:        ram,
-          storage:    storage,
-          size:       size,
-          harga:      harga,
-          note:       note
-        };
+    return {
+      map: map,
+      typeLaptops: Object.keys(laptopSet).sort(),
+      typeProcs:   Object.keys(procSet).sort(),
+      processors:  Object.keys(processorSet).sort(),
+      rams:        Object.keys(ramSet).sort(),
+      storages:    Object.keys(storageSet).sort(),
+      sizes:       Object.keys(sizeSet).sort(function(a, b){
+                     var na = parseFloat(a) || 0;
+                     var nb = parseFloat(b) || 0;
+                     if (na !== nb) return na - nb;
+                     return a.localeCompare(b);
+                   })
+    };
+  } catch(e) {
+    Logger.log('_readNBFiltersFromActive error: ' + e.toString());
+    return null;
+  }
+}
 
-        if (typeLaptop) laptopSet[typeLaptop] = true;
-        if (typeProc)   procSet[typeProc]     = true;
-        if (processor)  processorSet[processor] = true;
-        if (ram)        ramSet[ram]           = true;
-        if (storage)    storageSet[storage]   = true;
-        if (size)       sizeSet[size]         = true;
-      }
+function _getMasterDataRaw(masterSheetName) {
+  try {
+    const isPC = /master\s*sku\s*pc/i.test(String(masterSheetName));
+    const cfg  = isPC ? EXTERNAL_SOURCES.PC : EXTERNAL_SOURCES.NB;
 
-      map[code.toUpperCase()] = entry;
+    // 1) Baca data dari spreadsheet sumber langsung (bypass IMPORTRANGE)
+    const ext = SpreadsheetApp.openById(EXTERNAL_SOURCES.spreadsheetId);
+    const hargaMap = _readExternalKeyValueMap(ext, cfg.hargaSheet, cfg.hargaColCode, cfg.hargaColPrice, 'number');
+    const noteMap  = _readExternalKeyValueMap(ext, cfg.noteSheet,  cfg.noteColCode,  cfg.noteColNote,  'text');
+
+    // 2) Untuk NB: gabung dengan filter fields dari active Master SKU NB
+    //    (typeLaptop/ram/size/typeProc/processor untuk dropdown filter)
+    const filters = isPC ? null : _readNBFiltersFromActive();
+
+    // 3) Combine semua map jadi 1 map per SKU
+    const allCodes = {};
+    Object.keys(hargaMap).forEach(function(c){ allCodes[c] = true; });
+    Object.keys(noteMap).forEach(function(c){ allCodes[c] = true; });
+    if (filters && filters.map) {
+      Object.keys(filters.map).forEach(function(c){ allCodes[c] = true; });
+    }
+
+    const map = {};
+    let priceMin = Infinity, priceMax = -Infinity;
+
+    Object.keys(allCodes).forEach(function(code){
+      const fEntry = (filters && filters.map[code]) ? filters.map[code] : {};
+      const harga  = hargaMap[code] || 0;
+      const note   = noteMap[code]  || '';
+
+      map[code] = {
+        typeLaptop: fEntry.typeLaptop || '',
+        typeProc:   fEntry.typeProc   || '',
+        processor:  fEntry.processor  || '',
+        ram:        fEntry.ram        || '',
+        storage:    fEntry.storage    || '',
+        size:       fEntry.size       || '',
+        harga:      harga,
+        note:       note
+      };
 
       if (harga > 0) {
         if (harga < priceMin) priceMin = harga;
         if (harga > priceMax) priceMax = harga;
       }
-    }
+    });
 
     if (priceMin === Infinity)  priceMin = 0;
     if (priceMax === -Infinity) priceMax = 0;
@@ -499,18 +593,12 @@ function _getMasterDataRaw(masterSheetName) {
     return {
       success:     true,
       map:         map,
-      typeLaptops: Object.keys(laptopSet).sort(),
-      typeProcs:   Object.keys(procSet).sort(),
-      processors:  Object.keys(processorSet).sort(),
-      rams:        Object.keys(ramSet).sort(),
-      storages:    Object.keys(storageSet).sort(),
-      // Size layar: sort numerik kecil → besar (parse value, bukan string compare)
-      sizes:       Object.keys(sizeSet).sort(function(a, b){
-                     var na = parseFloat(a) || 0;
-                     var nb = parseFloat(b) || 0;
-                     if (na !== nb) return na - nb;
-                     return a.localeCompare(b);
-                   }),
+      typeLaptops: filters ? filters.typeLaptops : [],
+      typeProcs:   filters ? filters.typeProcs   : [],
+      processors:  filters ? filters.processors  : [],
+      rams:        filters ? filters.rams        : [],
+      storages:    filters ? filters.storages    : [],
+      sizes:       filters ? filters.sizes       : [],
       priceMin:    priceMin,
       priceMax:    priceMax
     };
