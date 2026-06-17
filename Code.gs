@@ -127,6 +127,47 @@ const PROCESSOR_LOOKUP = {
 };
 
 // ============================================================
+// NORMALIZE TYPE PROC — port dari formula Sheets di kolom F:
+//   =if(left(E2;7)="Celeron";"Celeron";
+//   if(left(E2;7)="Pentium";"Pentium";
+//   if(left(E2;6)="Athlon";"Athlon";
+//   (if(left(E2;10)="Core Ultra";left(E2;12);
+//   (if(left(E2;5)="Ultra";left(E2;7);
+//   (if(left(E2;6)="Core i";left(E2;7);
+//   (if(left(E2;4)="Core";left(E2;6);
+//   (if(left(E2;8)="Ryzen AI";Left(E2;10);
+//   (if(left(E2;5)="Ryzen";Left(E2;7);
+//   (if(or(left(E2;2)="A4";left(E2;2)="A6";left(E2;2)="A9";left(E2;2)="E2");left(E2;2);
+//   if(left(E2;3)="A12";"A12";E2))))))))))
+//
+// Kenapa perlu: data raw di Laptop_Products kol F (mis. "Core i7-1255U")
+// nggak match langsung dengan key di Master SKU NB kol P (mis. "Core i7").
+// Setelah dinormalisasi, vlookup ke kol P-Q jadi konsisten.
+// Order pengecekan = sama dengan formula (penting karena prefix overlap,
+// mis. "Core Ultra" sebelum "Core i" sebelum "Core").
+// ============================================================
+function _normalizeTypeProc(s) {
+  if (s === null || s === undefined || s === '') return '';
+  var v = String(s);
+
+  if (v.substring(0, 7)  === 'Celeron')    return 'Celeron';
+  if (v.substring(0, 7)  === 'Pentium')    return 'Pentium';
+  if (v.substring(0, 6)  === 'Athlon')     return 'Athlon';
+  if (v.substring(0, 10) === 'Core Ultra') return v.substring(0, 12);
+  if (v.substring(0, 5)  === 'Ultra')      return v.substring(0, 7);
+  if (v.substring(0, 6)  === 'Core i')     return v.substring(0, 7);
+  if (v.substring(0, 4)  === 'Core')       return v.substring(0, 6);
+  if (v.substring(0, 8)  === 'Ryzen AI')   return v.substring(0, 10);
+  if (v.substring(0, 5)  === 'Ryzen')      return v.substring(0, 7);
+
+  var p2 = v.substring(0, 2);
+  if (p2 === 'A4' || p2 === 'A6' || p2 === 'A9' || p2 === 'E2') return p2;
+  if (v.substring(0, 3) === 'A12') return 'A12';
+
+  return v; /* default: kembalikan apa adanya (case fallback formula) */
+}
+
+// ============================================================
 // WEB APP ENTRY
 // 2 versi dalam 1 app:
 //   ?mode=cache -> versi dengan in-memory cache (index_cache.html)
@@ -149,7 +190,7 @@ function doGet(e) {
 //  - Tombol "Update Data" pass forceFresh=true → bypass cache
 //  - Cache disimpan jika respons sukses (skip kalau ada error)
 // ============================================================
-const CACHE_VER = 'v7';   // bump ini saat shape data berubah
+const CACHE_VER = 'v8';   // bump ini saat shape data berubah
 
 function _cacheGet(key) {
   try {
@@ -529,7 +570,9 @@ function _readNBProductsFromExternal(spreadsheet) {
       const upCode = code.toUpperCase();
 
       const typeLaptop = String(row[cfg.typeLaptop] || '').trim();
-      const typeProc   = String(row[cfg.typeProc]   || '').trim();
+      // Normalize raw typeProc (kol F) -> bentuk pendek yang match dgn Master SKU NB kol P
+      // mis. "Core i7-1255U" -> "Core i7", "Ryzen AI 9 HX 370" -> "Ryzen AI 9"
+      const typeProc   = _normalizeTypeProc(String(row[cfg.typeProc] || '').trim());
       // RAM: ambil 5 karakter awal sesuai requirement sebelumnya
       const ram        = String(row[cfg.ram]        || '').substring(0, 5).trim();
       const storage    = String(row[cfg.storage]    || '').trim();
