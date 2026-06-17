@@ -629,7 +629,7 @@
   .beli-count b{color:var(--accent2);font-weight:700;}
 
   .beli-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto;max-height:calc(100vh - 200px);overflow-y:auto;}
-  .beli-table{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed;font-family:'Calibri','Segoe UI',sans-serif;min-width:1550px;}
+  .beli-table{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed;font-family:'Calibri','Segoe UI',sans-serif;min-width:1750px;}
   .beli-table th, .beli-table td, .beli-table span, .beli-table button, .beli-table div{font-family:'Calibri','Segoe UI',sans-serif !important;}
   .beli-table thead{position:sticky;top:0;z-index:9;}
   .beli-table th{padding:9px 10px;text-align:left;font-size:10.5px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap;border-bottom:2px solid var(--border2);background:var(--bg2);}
@@ -1360,14 +1360,14 @@ function exportBeli() {
     return;
   }
 
-  var headers = ['Sumber','Departemen','Kode','Nama Barang','ALL STOK','ALL OUT','KIRA² Habis','ORDER (+)','ORDER (-)','Harga Beli','Tgl Beli','Harga ELS','Note'];
+  var headers = ['Sumber','Departemen','Kode','Nama Barang','ALL STOK','ALL OUT','KIRA² Habis','ORDER (+)','ORDER (-)','KSG','PO','KEEP','Harga Beli','Tgl Beli','Harga ELS','Note'];
   var rows = items.map(function(it){
-    return [it.source, it.dept, it.code, it.name, it.stokAll, it.allOut, it.kira2, it.orderPlus, it.orderMinus, it.hargaBeli, it.hargaDate, (it.hargaEls>0?fmtRupiahJS(it.hargaEls):''), it.note || ''];
+    return [it.source, it.dept, it.code, it.name, it.stokAll, it.allOut, it.kira2, it.orderPlus, it.orderMinus, it.ketKsg||'', it.po||'', it.ketKeep||0, it.hargaBeli, it.hargaDate, (it.hargaEls>0?fmtRupiahJS(it.hargaEls):''), it.note || ''];
   });
 
   var filterLabel = (_beliFilter === 'all') ? '' : ('_' + _beliFilter);
-  var fname = 'BELI' + filterLabel + '_' + getDateStamp() + '.xls';
-  downloadXLS(headers, rows, 'BELI', fname);
+  var fname = 'OrderBeli' + filterLabel + '_' + getDateStamp() + '.xls';
+  downloadXLS(headers, rows, 'Order Beli', fname);
 }
 
 /* Helper: timestamp untuk nama file */
@@ -1433,7 +1433,7 @@ function renderSheetTabs(sheets) {
   }).join('');
   /* Tambahkan tab Push Jual & BELI (hardcoded) */
   html += '<button class="tab-btn" onclick="switchToPushJual(this)">Push Jual</button>';
-  html += '<button class="tab-btn" onclick="switchToBeli(this)">BELI</button>';
+  html += '<button class="tab-btn" onclick="switchToBeli(this)">Order Beli</button>';
   c.innerHTML = html;
 }
 
@@ -2600,7 +2600,7 @@ function switchToBeli(btn) {
 
   if (missing.length > 0) {
     var area = document.getElementById('content-area');
-    area.innerHTML = '<div class="loading-overlay"><div class="spinner"></div><div class="loading-text">Memuat data BELI...</div></div>';
+    area.innerHTML = '<div class="loading-overlay"><div class="spinner"></div><div class="loading-text">Memuat data Order Beli...</div></div>';
     var promises = missing.map(function(s){ return fetchAll(s).then(function(p){ _preloaded[s] = p; }); });
     Promise.all(promises).then(function(){
       sheetsNeeded.forEach(function(s){
@@ -2753,6 +2753,9 @@ function filterBeliFromPreloaded(sheetName, sourceLabel) {
         poHeader:    poHeader,
         orderPlus:   item.orderPlus || 0,
         orderMinus:  item.orderMinus || 0,
+        ketKsg:      String(item.ketKsg || ''),
+        po:          String(item.po || ''),
+        ketKeep:     item.ketKeep || 0,
         hargaBeli:   hargaBeli,
         hargaDate:   hargaDate,
         hargaEls:    hargaEls,
@@ -2765,6 +2768,27 @@ function filterBeliFromPreloaded(sheetName, sourceLabel) {
 }
 
 function buildBeliTable(items) {
+  /* Helper: render KSG/PO/KEEP value cells (mirror style report table) */
+  function _ksgCell(v) {
+    var s = String(v || '').trim();
+    if (!s || s === '0') return '<span class="beli-note empty">—</span>';
+    if (s.toLowerCase() === 'ksg' || s === '1') return '<span class="badge-ksg">KSG</span>';
+    if (s.toLowerCase() === 'bns') return '<span class="badge-bns">BNS</span>';
+    return '<span class="beli-num">' + escHtml(s) + '</span>';
+  }
+  function _poCell(v) {
+    var s = String(v || '').trim();
+    return (s && s !== '0')
+      ? '<span class="beli-num">' + escHtml(s) + '</span>'
+      : '<span class="beli-note empty">—</span>';
+  }
+  function _keepCell(v) {
+    var n = parseFloat(v) || 0;
+    return n === 0
+      ? '<span class="beli-note empty">—</span>'
+      : '<span class="beli-num">' + n + '</span>';
+  }
+
   var rows = items.map(function(it) {
     var srcClass = (it.source === 'NB') ? 'nb' : 'pc';
     var stokCls = it.stokAll > 0 ? 'beli-num' : 'beli-num zero';
@@ -2794,6 +2818,9 @@ function buildBeliTable(items) {
       + '<td class="b-cen"><span class="beli-kira">'+it.kira2+'</span></td>'
       + '<td class="b-cen"><span class="beli-order-p'+(it.orderPlus===0?' zero':'')+'">'+(it.orderPlus||0)+'</span></td>'
       + '<td class="b-cen"><span class="beli-order-m'+(it.orderMinus===0?' zero':'')+'">'+(it.orderMinus||0)+'</span></td>'
+      + '<td class="b-cen">'+_ksgCell(it.ketKsg)+'</td>'
+      + '<td class="b-cen">'+_poCell(it.po)+'</td>'
+      + '<td class="b-cen">'+_keepCell(it.ketKeep)+'</td>'
       + '<td class="b-rgt">'+hargaCell+'</td>'
       + '<td class="b-rgt">'+hargaElsCell+'</td>'
       + '<td class="b-lft" title="'+escAttr(it.note||'')+'"><span class="beli-note'+(it.note?'':' empty')+'">'+escHtml(it.note||'—')+'</span></td>'
@@ -2810,6 +2837,9 @@ function buildBeliTable(items) {
       + '<col style="width:90px">'   /* Kira² */
       + '<col style="width:90px">'   /* Order + */
       + '<col style="width:90px">'   /* Order - */
+      + '<col style="width:70px">'   /* KSG */
+      + '<col style="width:80px">'   /* PO */
+      + '<col style="width:60px">'   /* KP (KEEP) */
       + '<col style="width:140px">'  /* Harga Beli */
       + '<col style="width:120px">'  /* Harga ELS */
       + '<col style="width:240px">'  /* Note */
@@ -2823,6 +2853,9 @@ function buildBeliTable(items) {
       + '<th class="b-cen">KIRA²</th>'
       + '<th class="b-cen">ORDER (+)</th>'
       + '<th class="b-cen">ORDER (-)</th>'
+      + '<th class="b-cen">KSG</th>'
+      + '<th class="b-cen">PO</th>'
+      + '<th class="b-cen">KP</th>'
       + '<th class="b-rgt">Harga Beli</th>'
       + '<th class="b-rgt">Harga ELS</th>'
       + '<th class="b-lft">Note</th>'
