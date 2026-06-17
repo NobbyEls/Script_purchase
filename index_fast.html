@@ -2109,6 +2109,30 @@ function applyMasterData(master){
   masterReady        = true;
 }
 
+/* Parse string storage ("64GB", "1TB", "512 GB", "2 TB", dll) ke ukuran GB
+   untuk keperluan sort numerik ascending. Unit diasumsikan GB jika tidak ada. */
+function _parseStorageGB(s){
+  if (s === null || s === undefined || s === '') return Number.MAX_SAFE_INTEGER;
+  var str = String(s).toUpperCase().replace(/\s+/g, '');
+  var m = str.match(/(\d+(?:[.,]\d+)?)\s*(TB|GB|MB|T|G|M)?/);
+  if (!m) return Number.MAX_SAFE_INTEGER;
+  var n = parseFloat(m[1].replace(',', '.'));
+  if (isNaN(n)) return Number.MAX_SAFE_INTEGER;
+  var unit = m[2] || 'GB';
+  if (unit === 'TB' || unit === 'T') return n * 1024;
+  if (unit === 'MB' || unit === 'M') return n / 1024;
+  return n; /* GB */
+}
+
+/* Sort array storage dari kecil ke besar: 64GB, 128GB, 256GB, 512GB, 1TB, 2TB, ... */
+function _sortStorageAsc(arr){
+  return (arr || []).slice().sort(function(a, b){
+    var na = _parseStorageGB(a), nb = _parseStorageGB(b);
+    if (na !== nb) return na - nb;
+    return String(a).localeCompare(String(b));
+  });
+}
+
 /* Bangun isi dropdown + bound slider harga (dipanggil saat ganti sheet) */
 function buildFilterControls(){
   var lSel = document.getElementById('filter-type-laptop');
@@ -2130,7 +2154,7 @@ function buildFilterControls(){
   ramSel.innerHTML = '<option value="">Semua</option>' + _masterRams.map(function(v){
     return '<option value="'+escHtml(v)+'">'+escHtml(v)+'</option>';
   }).join('');
-  stoSel.innerHTML = '<option value="">Semua</option>' + _masterStorages.map(function(v){
+  stoSel.innerHTML = '<option value="">Semua</option>' + _sortStorageAsc(_masterStorages).map(function(v){
     return '<option value="'+escHtml(v)+'">'+escHtml(v)+'</option>';
   }).join('');
   sizSel.innerHTML = '<option value="">Semua</option>' + _masterSizes.map(function(v){
