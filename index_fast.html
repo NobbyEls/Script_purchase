@@ -116,25 +116,25 @@
   body.light-mode .out-popup-val.neg,
   body.light-mode .stok-popup .out-popup-val.neg{color:var(--red) !important;}
 
-  /* ── LIGHT MODE — Kepala tabel (thead) pakai gradient ungu→pink (sama dgn tombol Update) ── */
+  /* ── LIGHT MODE — Kepala tabel (thead) berwarna GELAP ── */
   /* Tabel report (Purchase NB / PC) — header utama + sticky clone */
   body.light-mode .report-table thead tr:first-child th,
   body.light-mode .thead-clone .report-table tr:first-child th{
-    background:var(--accent-grad) !important;
-    color:#fff !important;
-    border-right-color:rgba(255,255,255,0.18) !important;
+    background:#1e293b !important;
+    color:#cbd5e1 !important;
+    border-right-color:rgba(255,255,255,0.08) !important;
   }
   body.light-mode .report-table thead tr:last-child th,
   body.light-mode .thead-clone .report-table tr:last-child th{
-    background:linear-gradient(135deg,#7c3aed,#db2777) !important;
-    color:#fff !important;
-    border-right-color:rgba(255,255,255,0.18) !important;
+    background:#0f172a !important;
+    color:#cbd5e1 !important;
+    border-right-color:rgba(255,255,255,0.08) !important;
   }
-  /* Th-group accent: readable di atas gradient (light mode tetap konsisten) */
-  body.light-mode .th-group.blue  {color:#e0e7ff !important;border-bottom-color:rgba(255,255,255,0.22) !important;}
-  body.light-mode .th-group.teal  {color:#a7f3d0 !important;border-bottom-color:rgba(255,255,255,0.22) !important;}
-  body.light-mode .th-group.amber {color:#fde68a !important;border-bottom-color:rgba(255,255,255,0.22) !important;}
-  body.light-mode .th-group.purple{color:#f3e8ff !important;border-bottom-color:rgba(255,255,255,0.22) !important;}
+  /* Th-group accent: di atas background gelap, kembali ke warna aksen agar readable */
+  body.light-mode .th-group.blue  {color:var(--accent2) !important;}
+  body.light-mode .th-group.teal  {color:var(--teal)    !important;}
+  body.light-mode .th-group.amber {color:var(--amber)   !important;}
+  body.light-mode .th-group.purple{color:var(--purple)  !important;}
 
   /* Modal Riwayat Pembelian — header tabel */
   body.light-mode .hist-table thead tr,
@@ -252,29 +252,21 @@
   /* Force semua font dalam tabel report jadi Calibri (override --mono) */
   .report-table th, .report-table td, .report-table span, .report-table button, .report-table div{font-family:'Calibri','Segoe UI',sans-serif !important;}
 
-  /* ── THEAD styling — gradient ungu→pink (sama seperti btn-refresh / .tab-btn.active) ── */
-  .report-table thead tr:first-child th{
-    background:var(--accent-grad);
-    color:#fff;
-    border-right-color:rgba(255,255,255,0.18);
-  }
-  .report-table thead tr:last-child th{
-    background:linear-gradient(135deg,#7c3aed,#db2777);
-    color:#fff;
-    border-right-color:rgba(255,255,255,0.18);
-  }
+  /* ── THEAD styling ── */
+  .report-table thead tr:first-child th{background:var(--bg2);}
+  .report-table thead tr:last-child  th{background:var(--bg3);}
 
   /* ── TH umum ── */
   .report-table th{
     padding:7px 5px;
     text-align:center;
     font-size:10.5px;
-    font-weight:700;
-    color:#fff;
+    font-weight:600;
+    color:var(--text3);
     text-transform:uppercase;
-    letter-spacing:0.3px;
+    letter-spacing:0.2px;
     white-space:nowrap;
-    border-right:1px solid rgba(255,255,255,0.18);
+    border-right:1px solid var(--border);
     /* TIDAK set width di sini — dikendalikan <col> */
     overflow:hidden;
   }
@@ -287,12 +279,11 @@
     padding-right:8px;
   }
 
-  .th-group{padding:6px 5px;font-size:10.5px;font-weight:700;letter-spacing:0.4px;}
-  /* Group accents — readable di atas gradient ungu-pink */
-  .th-group.blue  {color:#e0e7ff;border-bottom:1px solid rgba(255,255,255,0.22);}
-  .th-group.teal  {color:#a7f3d0;border-bottom:1px solid rgba(255,255,255,0.22);}
-  .th-group.amber {color:#fde68a;border-bottom:1px solid rgba(255,255,255,0.22);}
-  .th-group.purple{color:#f3e8ff;border-bottom:1px solid rgba(255,255,255,0.22);}
+  .th-group{padding:6px 5px;font-size:10.5px;font-weight:600;letter-spacing:0.3px;}
+  .th-group.blue  {color:var(--accent2);border-bottom:1px solid rgba(96,165,250,0.2);}
+  .th-group.teal  {color:var(--teal);   border-bottom:1px solid rgba(20,184,166,0.2);}
+  .th-group.amber {color:var(--amber);  border-bottom:1px solid rgba(245,158,11,0.2);}
+  .th-group.purple{color:var(--purple); border-bottom:1px solid rgba(168,85,247,0.2);}
 
   /* ── TR / TD ── */
   .report-table tbody tr{border-bottom:1px solid var(--border);transition:var(--transition);}
@@ -461,9 +452,9 @@
     border-collapse:collapse;
     table-layout:fixed;        /* wajib agar colgroup bekerja */
   }
-  .thead-clone .report-table th{white-space:nowrap;color:#fff;border-right-color:rgba(255,255,255,0.18);}
-  .thead-clone .report-table tr:first-child th{background:var(--accent-grad);}
-  .thead-clone .report-table tr:last-child  th{background:linear-gradient(135deg,#7c3aed,#db2777);}
+  .thead-clone .report-table th{white-space:nowrap;}
+  .thead-clone .report-table tr:first-child th{background:var(--bg2);}
+  .thead-clone .report-table tr:last-child  th{background:var(--bg3);}
 
   /* ── MODAL ── */
   .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:200;backdrop-filter:blur(5px);align-items:center;justify-content:center;}
